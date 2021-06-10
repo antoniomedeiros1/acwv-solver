@@ -1,14 +1,31 @@
+#define _USE_MATH_DEFINES
+#define STENCIL 3 
+
 #include <iostream>
 #include <fstream>
 #include <cmath>
+#include "math.h"
 #include <iomanip>
 #include <string>
 #include "Matriz3D.cpp"
-
-#define M_PI 3.14159265358979323846 
-#define M_e 2.71828182845904523536
+#include "./include/Matriz2d.h"
 
 using namespace std;
+
+// 1. Melhorar a estrutura do Codigo
+//   1.a: Utilize estrutura de diretorio do projeto:
+//        src/            --> todos os arquivos .cpp
+//        include/        --> todos os arquivos .h
+//        main.cpp
+//        CMakeLists.txt  --> Arquivo de configuração de projeto qye usa Cmake.
+// 2. Estudar https://cmake.org/ e gerar um scrip CMakeLists.txt para compilar 
+//       o código considerando a estrutura acima.
+// 3. Modificar o código para trabalhar apenas com dois/tres vetores.
+// 4. Considerar o tamanho do stencil nos loops i,j
+// 5. Implementar a camada de atenuação por borda.
+// 6: Remover os ifs internos nas funções get de matriz3D e atenuação
+// 7. Criar arquivo com funções de escrita e chamar a função dentro do laco do tempo.
+// 8. Implementar uma estrutura ou classe para armazenar os parametros do problema
 
 int main() {
 
@@ -17,10 +34,6 @@ int main() {
     float T = 1;    //Tempo total em s
     float c = 2200;  //Celeridade da onda em m/s
     float fcorte = 40;  //frequencia de pico = 40Hz
-
-    float alpha = 5;
-    float beta = 5;
-
     float dx = 10;  //Passos em x
     float dz = dx;  //Passos em z
     float dt = 0.00025;   //Passos no tempo
@@ -32,6 +45,8 @@ int main() {
     int xs = 150; //posicao da fonte em x
     int zs = 150; //posicao da fonte em z
     float cou = c*dt/dx; //numero de courant, para dx = dz
+    float c1 = (pow(cou, 2)/12.0);
+    float c2 = pow(c*dt, 2);
 
     cout << "Nx = " << Nx << endl;
     cout << "Nz = " << Nz << endl;
@@ -46,6 +61,39 @@ int main() {
     void plot1d(int t1, int t2, int passo, Matriz3D u, int Nx);
 
     bool yet = false;
+
+    Matriz2d u_current(Nx, Nz);
+    Matriz2d u_old(Nx, Nz);
+    Matriz2d u_next(Nx, Nz);
+
+    for (int k = 0; k < Nt; k++){
+        // calcula u_next
+        for (int j = STENCIL; j < Nz - STENCIL; j++){
+
+            for (int i = STENCIL; i < Nx - STENCIL; i++){
+
+                val = 
+                c1 *
+                (
+                    -1*(u_current.get(i - 2, j) + u_current.get(i, j - 2)) + 
+                    16*(u_current.get(i - 1, j) + u_current.get(i, j - 1)) - 
+                    60* u_current.get(i, j) +
+                    16*(u_current.get(i + 1, j) + u_current.get(i, j + 1)) -
+                    (u_current.get(i + 2, j) + u_current.get(i, j + 2)) 
+                )
+                + 2*u_current.get(i, j) - u_next.get(i, j) - 
+                c2 * fonte(i, j, k*dt, fcorte, xs, zs);
+
+                u_next.set(i, j, val);
+
+            }
+
+        }
+
+        // gera arquivo com os dados de u_next
+
+        // atualiza
+    }
 
     Matriz3D u(Nx, Nz, Nt);
     ofstream myfile;    
@@ -131,7 +179,7 @@ float fonte(int x, int z, float t, float fcorte, float xs, float zs){
 
     float eq1 = (1.0 - 2.0 * M_PI * pow(M_PI * fc * td, 2));
 
-    float eq2 = pow(M_e, M_PI*pow((M_PI*fc*td), 2));
+    float eq2 = pow(M_E, M_PI*pow((M_PI*fc*td), 2));
 
     return eq1/eq2;
 
@@ -141,13 +189,13 @@ float atenuacao(int x, int z, int Nx, int Nz){
 
     int n = 20;
     if (x < n){
-        return pow(M_e, -1*pow(0.098*(n - x), 2));
+        return pow(M_E, -1*pow(0.098*(n - x), 2));
     } else if (x > Nx - n){
-        return pow(M_e, -1*pow(0.098*(n - (Nx - x)), 2));
+        return pow(M_E, -1*pow(0.098*(n - (Nx - x)), 2));
     } else if (z < n){
-        return pow(M_e, -1*pow(0.098*(n - z), 2));
+        return pow(M_E, -1*pow(0.098*(n - z), 2));
     } else if (z > Nz - n){
-        return pow(M_e, -1*pow(0.098*(n - (Nz - z)), 2));
+        return pow(M_E, -1*pow(0.098*(n - (Nz - z)), 2));
     } else {
         return 1.0;
     }
