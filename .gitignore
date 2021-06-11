@@ -1,0 +1,6 @@
+# arquivos de dados
+.dat
+
+# diretorios
+.vscode
+build
