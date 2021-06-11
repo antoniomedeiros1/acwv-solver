@@ -1,5 +1,5 @@
 # arquivos de dados
-.dat
+*.dat
 
 # diretorios
 .vscode
