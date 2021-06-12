@@ -7,13 +7,7 @@ O método escolhido para tal foi o Método das Diferenças Finitas (MDF).
 
 ## método das diferenças finitas
 A equação da onda é uma Equação Diferencial Parcial (EDP) de segunda ordem. Realizando uma expansão de Taylor de segunda ordem no tempo e quarta ordem no espaço,
-chegamos na forma iterativa de calcular cada ponto (i, j) no passo k + 1 no tempo:
-
-![plot](mdf.png)
-
-Onde c é a velocidade da onda no meio, h a distância entre cada ponto do domínio (largura da malha) e f a função fonte (pulso) dada por:
-
-![plot](funcao-fonte.png)
+chegamos na forma iterativa de calcular cada ponto (i, j) no passo k + 1 no tempo. A forma discreta da equação da onda depende ainda da função fonte que pode ser aplicada em qualquer ponto da malha.
 
 ## condições de contorno
 
