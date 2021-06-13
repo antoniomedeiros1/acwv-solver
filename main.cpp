@@ -21,7 +21,7 @@ using namespace std;
 //       o código considerando a estrutura acima.
 // 3. Modificar o código para trabalhar apenas com dois/tres vetores. ✔
 // 4. Considerar o tamanho do stencil nos loops i,j ✔
-// 5. Implementar a camada de atenuação por borda.
+// 5. Implementar a camada de atenuação por borda. (implementado porem nao esta funcionando corretamente)
 // 6: Remover os ifs internos nas funções get de matriz3D e atenuação ✔
 // 7. Criar arquivo com funções de escrita e chamar a função dentro do laco do tempo.
 // 8. Implementar uma estrutura ou classe para armazenar os parametros do problema
@@ -44,60 +44,67 @@ float fonte(int x, int z, float t, float fcorte, float xs, float zs){
 
 }
 
-float atenuacao(int x, int z, int Nx, int Nz){
-
-    int n = 20;
-    if (x < n){
-        return pow(M_E, -1*pow(0.098*(n - x), 2));
-    } else if (x > Nx - n){
-        return pow(M_E, -1*pow(0.098*(n - (Nx - x)), 2));
-    } else if (z < n){
-        return pow(M_E, -1*pow(0.098*(n - z), 2));
-    } else if (z > Nz - n){
-        return pow(M_E, -1*pow(0.098*(n - (Nz - z)), 2));
-    } else {
-        return 1.0;
-    }
-
+float atenuacao(int d){
+    return pow(M_E, -1*pow(0.098*d, 2));
 }
 
 int main() {
 
-    float X = 3000; //Largura do dominio em m
-    float Z = 3000; //Altura do dominio em m
-    float T = 1;    //Tempo total em s
-    float c = 2200;  //Celeridade da onda em m/s
-    float fcorte = 40;  //frequencia de pico = 40Hz
-    float dx = 10;  //Passos em x
-    float dz = dx;  //Passos em z
-    float dt = 0.00025;   //Passos no tempo
+    float X = 3000;     // Largura do dominio em m
+    float Z = 3000;     // Altura do dominio em m
+    float T = 1;        // Tempo total em s
+    float c = 2200;     // Celeridade da onda em m/s
+    float fcorte = 40;  // frequencia de pico em Hz
+    float dx = 10;      // Passos em x
+    float dz = dx;      // Passos em z
+    float dt = 0.00025; // Passos no tempo
 
-    int Nx = X/dx; //Iteracoes em x
-    int Nz = Z/dz; //Iteracoes em z
-    int Nt = 3500;//T/dt; //Iteracoes no tempo
+    int Nx = X/dx;      // Iteracoes em x
+    int Nz = Z/dz;      // Iteracoes em z
+    int Nt = 3500;      // T/dt; //Iteracoes no tempo
 
-    int xs = 150; //posicao da fonte em x
-    int zs = 150; //posicao da fonte em z
-    float cou = c*dt/dx; //numero de courant, para dx = dz
-    float c1 = (pow(cou, 2)/12.0);
+    int xs = 150;       // posicao da fonte em x
+    int zs = 150;       // posicao da fonte em z
+
+    float cou = c*dt/dx;  // numero de courant, para dx = dz
+    float c1 = (pow(cou, 2)/12.0); 
     float c2 = pow(c*dt, 2);
+    int borda = 20;       // largura da borda que sofrera a atenuacao
+    int d;                // distancia entre o no e o contorno
+    float atenuacoes[borda];  
 
-    cout << "Nx = " << Nx << endl;
-    cout << "Nz = " << Nz << endl;
-    cout << "Nt = " << Nt << endl;
-    cout << "Numero de Courant = " << cou << endl;    
+    float val; // variavel auxiliar 
 
-    float val;
-    float w; //fator atenuador
-
+    // para calcular o mdf basta utilizar duas matrizes, uma para armazenar o valor atual
+    // e outra para calcular o proximo valor 
+    // como essa forma discreta da equacao da onda requer o valor dois passos atras no tempo (i, j, k - 2)
+    // basta realizar a troca dos valores de u_current para a u_next, assim na proxima iteracao os valores
+    // no tempo k - 2 ficam armazenados na mesma matriz que armazenara os valores futuros
     Matriz2d u_current(Nx, Nz);
-    Matriz2d u_old(Nx, Nz);
     Matriz2d u_next(Nx, Nz);
 
     ofstream myfile;    
     string base(".dat");
 
-    for (int k = 0; k < /*Nt*/ 10; k++){
+    // imprime os parametros 
+    cout << "Nx = " << Nx << endl;
+    cout << "Nz = " << Nz << endl;
+    cout << "Nt = " << Nt << endl;
+    cout << "Numero de Courant = " << cou << endl;
+
+    // calcula o vetor de atenuacoes para evitar que o calculo seja realizada a cada iteracao na borda
+    for(int i = 0; i < borda; i++){
+        atenuacoes[i] = atenuacao(i);
+    }
+
+    // MDF 
+    // o algoritmo segue a seguinte ordem:
+    //      1. inicializa duas matrizes zeradas u_current e u_next
+    //      2. calcula u_next a partir dos valores da u_current pelo MDF
+    //      3. percorre as bordas aplicando uma funcao de atenuacao do valor para evitar a reflexao
+    //      4. u_current passa a ser u_next e u_next recebe os valores anteriores de u_current
+    //      5. gera um arquivo de dados para plot a cada x iteracoes no tempo
+    for (int k = 0; k < Nt; k++){
 
         // calcula u_next
         for (int j = STENCIL; j < Nz - STENCIL; j++){
@@ -108,13 +115,20 @@ int main() {
                 (
                     -1*(u_current.get(i - 2, j) + u_current.get(i, j - 2)) + 
                     16*(u_current.get(i - 1, j) + u_current.get(i, j - 1)) - 
-                    60* u_current.get(i, j) +
+                    60* u_current.get(i,     j) +
                     16*(u_current.get(i + 1, j) + u_current.get(i, j + 1)) -
-                    (u_current.get(i + 2, j) + u_current.get(i, j + 2)) 
+                       (u_current.get(i + 2, j) + u_current.get(i, j + 2)) 
                 ) 
                 + 2*u_current.get(i, j) - u_next.get(i, j) - c2 * fonte(i, j, k*dt, fcorte, xs, zs);
 
                 u_next.set(i, j, val);
+            }
+        }
+
+        // percorre as bordas do modelo aplicando a atenuacao
+        for (int j = 0; j < borda; j++){
+            for(int i = 0; i < Nx; i++){
+                u_next.set(i, j, u_next.get(i, j) * atenuacoes[borda - j]);
             }
         }
 
@@ -127,12 +141,12 @@ int main() {
             }
         }
 
-        // gera arquivo de dados a cada 50 iteracoes em k
-        if (k % 5 == 0){
-            myfile.open(".././data" + to_string(k/5) + base);
+        // gera arquivo de dados a cada 500 iteracoes em k
+        if (k % 200 == 0){
+            myfile.open(".././data" + to_string(k/200) + base);
             for (int j = 0; j < Nz; j++){
                 for (int i = 0; i < Nx; i++){
-                    myfile << i << " " << j << " " << setprecision(17) << u_current.get(i, j) << "\n";
+                    myfile << i << " " << j << " " << u_current.get(i, j) << "\n";
                 }
                 myfile << "\n\n";
             }

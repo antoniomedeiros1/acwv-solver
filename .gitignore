@@ -1,5 +1,6 @@
 # arquivos de dados
 *.dat
+*.gif
 
 # diretorios
 .vscode
