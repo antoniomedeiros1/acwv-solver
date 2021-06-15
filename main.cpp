@@ -48,6 +48,20 @@ float atenuacao(int d){
     return pow(M_E, -1*pow(0.098*d, 2));
 }
 
+void geraArqGnuplot(Matriz2d u, int Nx, int Nz, int k, int modk, string base){
+    // essa funcao gera um arquivo de dados para plotar pelo GnuPlot
+    ofstream myfile;
+    myfile.open("./data" + to_string(k/modk) + base);
+        for (int j = 0; j < Nz; j++){
+            for (int i = 0; i < Nx; i++){
+                myfile << i << " " << j << " " << u.get(i, j) << "\n";
+            }
+            myfile << "\n\n";
+        }
+    myfile.close();
+}
+
+
 int main() {
 
     float X = 3000;     // Largura do dominio em m
