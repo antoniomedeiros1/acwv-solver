@@ -25,13 +25,15 @@ using namespace std;
 // 4. Considerar o tamanho do stencil nos loops i,j ✔
 // 5. Implementar a camada de atenuação por borda. (implementado porem nao esta funcionando corretamente)
 // 6: Remover os ifs internos nas funções get de matriz3D e atenuação ✔
-// 7. Criar arquivo com funções de escrita e chamar a função dentro do laco do tempo.
+// 7. Criar arquivo com funções de escrita e chamar a função dentro do laco do tempo. ✔
 // 8. Implementar uma estrutura ou classe para armazenar os parametros do problema
 
 
 float fonte(int x, int z, float t, float fcorte, float xs, float zs){
 
-    float td = t - ((2*sqrt(M_PI))/fcorte);
+    // *funcao que simula um pulso sismico na posica (xs, zs)
+
+    float td = t - ((2*sqrt(M_PI))/fcorte);  
     float fc = (fcorte/(3*sqrt(M_PI)));
 
     if (x != xs || z != zs){
@@ -49,6 +51,23 @@ float fonte(int x, int z, float t, float fcorte, float xs, float zs){
 float atenuacao(float d){
     return pow(M_E, -1*pow(0.098*d, 2));
 }
+
+void geraArqGnuplot(Matriz2d u, int Nx, int Nz, int k, int modk, string base){
+
+    // *essa funcao gera um arquivo de dados para plotar pelo GnuPlot
+    // ! erro: core dump
+
+    ofstream myfile;
+    myfile.open("./data" + to_string(k/modk) + base);
+        for (int j = 0; j < Nz; j++){
+            for (int i = 0; i < Nx; i++){
+                myfile << i << " " << j << " " << u.get(i, j) << "\n";
+            }
+            myfile << "\n\n";
+        }
+    myfile.close();
+}
+
 
 int main() {
 
@@ -88,7 +107,7 @@ int main() {
     ofstream myfile;    
     string base(".dat");
 
-    // imprime os parametros 
+    // *imprime os parametros 
     cout << "Nx = " << Nx << endl;
     cout << "Nz = " << Nz << endl;
     cout << "Nt = " << Nt << endl;
@@ -101,13 +120,13 @@ int main() {
         atenuacoes[i] = atenuacao(i);
     }
 
-    // MDF 
-    // o algoritmo segue a seguinte ordem:
-    //      1. inicializa duas matrizes zeradas u_current e u_next
-    //      2. calcula u_next a partir dos valores da u_current pelo MDF
-    //      3. percorre as bordas aplicando uma funcao de atenuacao do valor para evitar a reflexao
-    //      4. u_current passa a ser u_next e u_next recebe os valores anteriores de u_current
-    //      5. gera um arquivo de dados para plot a cada x iteracoes no tempo
+    // *MDF 
+    // *o algoritmo segue a seguinte ordem:
+    // *     1. inicializa duas matrizes zeradas u_current e u_next
+    // *     2. calcula u_next a partir dos valores da u_current pelo MDF
+    // *     3. percorre as bordas aplicando uma funcao de atenuacao do valor para evitar a reflexao
+    // *     4. u_current passa a ser u_next e u_next recebe os valores anteriores de u_current
+    // *     5. gera um arquivo de dados para plot a cada x iteracoes no tempo
     for (int k = 0; k < Nt; k++){
 
         // calcula u_next
@@ -180,7 +199,7 @@ int main() {
             }
         }
 
-        // gera arquivo de dados a cada 500 iteracoes em k
+        // *gera arquivo de dados a cada 500 iteracoes em k
         if (k % 200 == 0){
             myfile.open(".././data" + to_string(k/200) + base);
             for (int i = 0; i < Nx; i++){
