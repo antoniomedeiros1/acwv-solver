@@ -7,7 +7,9 @@
 #include "math.h"
 #include <iomanip>
 #include <string>
-#include "./include/Matriz2d.h"
+
+// O efeito de ter colocado  o comando
+#include "Matriz2d.h"
 
 using namespace std;
 
@@ -44,7 +46,7 @@ float fonte(int x, int z, float t, float fcorte, float xs, float zs){
 
 }
 
-float atenuacao(int d){
+float atenuacao(float d){
     return pow(M_E, -1*pow(0.098*d, 2));
 }
 
@@ -93,6 +95,8 @@ int main() {
     cout << "Numero de Courant = " << cou << endl;
 
     // calcula o vetor de atenuacoes para evitar que o calculo seja realizada a cada iteracao na borda
+    // CHECK: verificar se o parametro de 
+    //   entrada dever ser multiplicado por dx
     for(int i = 0; i < borda; i++){
         atenuacoes[i] = atenuacao(i);
     }
@@ -107,46 +111,82 @@ int main() {
     for (int k = 0; k < Nt; k++){
 
         // calcula u_next
-        for (int j = STENCIL; j < Nz - STENCIL; j++){
-            for (int i = STENCIL; i < Nx - STENCIL; i++){
+        for (int i = STENCIL; i < Nx - STENCIL; i++){
+            for (int j = STENCIL; j < Nz - STENCIL; j++){
 
                 val = 
                 c1 *
                 (
-                    -1*(u_current.get(i - 2, j) + u_current.get(i, j - 2)) + 
-                    16*(u_current.get(i - 1, j) + u_current.get(i, j - 1)) - 
-                    60* u_current.get(i,     j) +
-                    16*(u_current.get(i + 1, j) + u_current.get(i, j + 1)) -
-                       (u_current.get(i + 2, j) + u_current.get(i, j + 2)) 
+                    -1*(u_current(i - 2, j) + u_current(i, j - 2)) + 
+                    16*(u_current(i - 1, j) + u_current(i, j - 1)) - 
+                    60* u_current(i,     j) +
+                    16*(u_current(i + 1, j) + u_current(i, j + 1)) -
+                       (u_current(i + 2, j) + u_current(i, j + 2)) 
                 ) 
-                + 2*u_current.get(i, j) - u_next.get(i, j) - c2 * fonte(i, j, k*dt, fcorte, xs, zs);
+                + 2*u_current(i, j) - u_next(i, j) - c2 * fonte(i, j, k*dt, fcorte, xs, zs);
 
-                u_next.set(i, j, val);
+                //u_next.set(i, j, val);
+
+                u_next(i,j) = val;
             }
         }
 
         // percorre as bordas do modelo aplicando a atenuacao
-        for (int j = 0; j < borda; j++){
-            for(int i = 0; i < Nx; i++){
-                u_next.set(i, j, u_next.get(i, j) * atenuacoes[borda - j]);
-            }
-        }
+        // 
+        //     +-------------------+
+        //     |                   |
+        //     |                   |
+        //     |                   |
+        //     |                   |
+        //     |                   |
+        //     |                   |
+        //     +-------------------+
+        //
+        // for (int i = 0; i < borda; i++){
+        //     for(int j = 0; j < Nz; j++){
+        //         u_next(i, j) =  u_next(i, j) * atenuacao(j*dx);
+        //     }
+        // }
 
+        // Reynolds NR BC
+        // du/dx = (u(x+dx,t) - u(x,t))/dx
+        // du/dt = (u(x,t+dt) - u(x,t))/dt
+        // na direçao X
+        //   du/dt - vel*du/dx = 0
+        // (u(x,t+dt) - u(x,t))/dt + vel*(u(x+dx,t) - u(x,t))/dx
+        // (u(x,t+dt) - u(x,t)) =   dt*(-vel*(u(x+dx,t) - u(x,t))/dx
+        // u(x, t+dt) = u(x,t) - cou * (u(x+dx,t) - u(x,t) )
+        //    onde cou = dt*vel/dx
+        for (int i = 0; i < STENCIL; i++) {
+            for(int j = 0; j < Nz; j++) {
+                u_next(i,j) = u_current(i,j) - cou*(u_current(i+1,j) - u_current(i,j));
+            }
+
+       for (int i = Nx-STENCIL; i < Nx; i++) {
+            for(int j = 0; j < Nz; j++) {
+                u_next(i,j) = u_current(i,j) - cou*(u_current(i+1,j) - u_current(i,j));
+            }
+        //
+        //
+        /* TODO: Essa troca de vetores pode ser evitada
+         
+         */
         // troca u_next <--> u_current
-        for (int j = STENCIL; j < Nz - STENCIL; j++){
-            for (int i = STENCIL; i < Nx - STENCIL; i++){
-                val = u_next.get(i, j);
-                u_next.set(i, j, u_current.get(i, j));
-                u_current.set(i, j, val);
+        for (int i = STENCIL; i < Nx - STENCIL; i++){
+            for (int j = STENCIL; j < Nz - STENCIL; j++){
+                val = u_next(i, j);
+                u_next(i, j)    = u_current(i, j);
+                u_current(i, j)=  val;
             }
         }
 
         // gera arquivo de dados a cada 500 iteracoes em k
         if (k % 200 == 0){
             myfile.open(".././data" + to_string(k/200) + base);
-            for (int j = 0; j < Nz; j++){
-                for (int i = 0; i < Nx; i++){
-                    myfile << i << " " << j << " " << u_current.get(i, j) << "\n";
+            for (int i = 0; i < Nx; i++){
+                for (int j = 0; j < Nz; j++)
+                {
+                    myfile << i << " " << j << " " << u_current(i, j) << "\n";
                 }
                 myfile << "\n\n";
             }

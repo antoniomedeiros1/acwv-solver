@@ -1,16 +1,25 @@
-class Matriz2d {
+// Use algumas extensao do vscode para ajudar na documentação de suas classes.
+// Por exemplo: doxygen generator
+
+// Pensou em usar classes templates?
+// 
+
+
+class Matriz2d{
 
     public:
 
-        Matriz2d(int x, int z);
+        Matriz2d(int n_linhas, int n_colunas);
         ~Matriz2d();
         float get(int i, int j);
         void set(int i, int j, float val);
 
-    private:
+        // Veja como podemos usar sobrecarga de operadores.
+        float& operator()(int i, int j);
 
-        int l;
-        int a;
+    private:
+        int n_linhas;
+        int n_cols;
         float* mat;
 
 };
