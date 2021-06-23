@@ -178,6 +178,7 @@ int main() {
         // * borda direita
         //   du/dt + vel*du/dx = 0
         // u(x, t+dt) = u(x,t) - cou * (u(x+dx,t) - u(x,t) )
+        // ! Não esta sendo aplicada
         for (int i = Nx - STENCIL - 2; i < Nx; i++) {
             for(int j = 0; j < Nz; j++) {
                 u_next(i,j) = u_current(i,j) - cou*(u_current(i + 1,j) - u_current(i,j));
@@ -196,6 +197,7 @@ int main() {
         // * borda inferior
         //   du/dt - vel*du/dz = 0
         // u(z, t+dt) = u(z,t) - cou * (u(z+dz,t) - u(z,t) )
+        // ! Não esta sendo aplicada
         for (int i = 0; i < Nx; i++) {
             for(int j = Nz - STENCIL - 2; j < Nz; j++) {
                 u_next(i,j) = u_current(i,j) - cou*(u_current(i,j + 1) - u_current(i,j));
