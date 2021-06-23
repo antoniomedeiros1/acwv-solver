@@ -2,7 +2,7 @@
 // Por exemplo: doxygen generator
 
 // Pensou em usar classes templates?
-// 
+// TODO: usar templates para utilizar diferentes tipos de dados 
 
 
 class Matriz2d{

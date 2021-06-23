@@ -9,6 +9,5 @@ set cbrange [-3:3]
 set palette rgb 21,22,23
 set output 'plot1.gif'  
 set term gif animate delay 15
-do for [i=0:17] {plot 'data'.i.'.dat' with image}
+do for [i=0:19] {plot 'data'.i.'.dat' with image}
 unset output
-cd "../data"

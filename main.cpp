@@ -8,7 +8,6 @@
 #include <iomanip>
 #include <string>
 
-// O efeito de ter colocado  o comando
 #include "Matriz2d.h"
 
 using namespace std;
@@ -31,7 +30,7 @@ using namespace std;
 
 float fonte(int x, int z, float t, float fcorte, float xs, float zs){
 
-    // *funcao que simula um pulso sismico na posica (xs, zs)
+    // *funcao que simula um pulso sismico na posicao (xs, zs)
 
     float td = t - ((2*sqrt(M_PI))/fcorte);  
     float fc = (fcorte/(3*sqrt(M_PI)));
@@ -41,7 +40,6 @@ float fonte(int x, int z, float t, float fcorte, float xs, float zs){
     } 
 
     float eq1 = (1.0 - 2.0 * M_PI * pow(M_PI * fc * td, 2));
-
     float eq2 = pow(M_E, M_PI*pow((M_PI*fc*td), 2));
 
     return eq1/eq2;
@@ -82,7 +80,7 @@ int main() {
 
     int Nx = X/dx;      // Iteracoes em x
     int Nz = Z/dz;      // Iteracoes em z
-    int Nt = 3500;      // T/dt; //Iteracoes no tempo
+    int Nt = T/dt;      //Iteracoes no tempo
 
     int xs = 150;       // posicao da fonte em x
     int zs = 150;       // posicao da fonte em z
@@ -96,11 +94,6 @@ int main() {
 
     float val; // variavel auxiliar 
 
-    // para calcular o mdf basta utilizar duas matrizes, uma para armazenar o valor atual
-    // e outra para calcular o proximo valor 
-    // como essa forma discreta da equacao da onda requer o valor dois passos atras no tempo (i, j, k - 2)
-    // basta realizar a troca dos valores de u_current para a u_next, assim na proxima iteracao os valores
-    // no tempo k - 2 ficam armazenados na mesma matriz que armazenara os valores futuros
     Matriz2d u_current(Nx, Nz);
     Matriz2d u_next(Nx, Nz);
 
@@ -116,22 +109,23 @@ int main() {
     // calcula o vetor de atenuacoes para evitar que o calculo seja realizada a cada iteracao na borda
     // CHECK: verificar se o parametro de 
     //   entrada dever ser multiplicado por dx
-    for(int i = 0; i < borda; i++){
-        atenuacoes[i] = atenuacao(i);
-    }
+    // ! Verifiquei no material e o parametro i eh a distancia em pontos, nao precisa multiplicar por dx
+    // for(int i = 0; i < borda; i++){
+    //     atenuacoes[i] = atenuacao(i);
+    // }
 
-    // *MDF 
-    // *o algoritmo segue a seguinte ordem:
+    // * MDF 
+    // * o algoritmo segue a seguinte ordem:
     // *     1. inicializa duas matrizes zeradas u_current e u_next
     // *     2. calcula u_next a partir dos valores da u_current pelo MDF
     // *     3. percorre as bordas aplicando uma funcao de atenuacao do valor para evitar a reflexao
     // *     4. u_current passa a ser u_next e u_next recebe os valores anteriores de u_current
     // *     5. gera um arquivo de dados para plot a cada x iteracoes no tempo
-    for (int k = 0; k < Nt; k++){
+    for (int k = 0; k <= Nt; k++){
 
         // calcula u_next
-        for (int i = STENCIL; i < Nx - STENCIL; i++){
-            for (int j = STENCIL; j < Nz - STENCIL; j++){
+        for (int i = STENCIL; i <= Nx - STENCIL; i++){
+            for (int j = STENCIL; j <= Nz - STENCIL; j++){
 
                 val = 
                 c1 *
@@ -167,29 +161,49 @@ int main() {
         //     }
         // }
 
-        // Reynolds NR BC
-        // du/dx = (u(x+dx,t) - u(x,t))/dx
-        // du/dt = (u(x,t+dt) - u(x,t))/dt
-        // na direçao X
-        //   du/dt - vel*du/dx = 0
-        // (u(x,t+dt) - u(x,t))/dt + vel*(u(x+dx,t) - u(x,t))/dx
-        // (u(x,t+dt) - u(x,t)) =   dt*(-vel*(u(x+dx,t) - u(x,t))/dx
-        // u(x, t+dt) = u(x,t) - cou * (u(x+dx,t) - u(x,t) )
-        //    onde cou = dt*vel/dx
-        for (int i = 0; i < STENCIL; i++) {
-            for(int j = 0; j < Nz; j++) {
-                u_next(i,j) = u_current(i,j) - cou*(u_current(i+1,j) - u_current(i,j));
-            }
+        // * Reynolds NR BC
 
-       for (int i = Nx-STENCIL; i < Nx; i++) {
+        // * borda esquerda
+        //   du/dt - vel*du/dx = 0
+        // (u(x,t+dt) - u(x,t))/dt = vel*(u(x+dx,t) - u(x,t))/dx
+        // (u(x,t+dt) - u(x,t)) =   dt*(vel*(u(x+dx,t) - u(x,t))/dx
+        // u(x, t+dt) = u(x,t) + cou * (u(x+dx,t) - u(x,t) )
+        //    onde cou = dt*vel/dx
+        for (int i = 0; i <= STENCIL + 1; i++) {
             for(int j = 0; j < Nz; j++) {
-                u_next(i,j) = u_current(i,j) - cou*(u_current(i+1,j) - u_current(i,j));
+                u_next(i,j) = u_current(i,j) + cou*(u_current(i + 1,j) - u_current(i,j));
             }
-        //
-        //
-        /* TODO: Essa troca de vetores pode ser evitada
-         
-         */
+        }
+
+        // * borda direita
+        //   du/dt + vel*du/dx = 0
+        // u(x, t+dt) = u(x,t) - cou * (u(x+dx,t) - u(x,t) )
+        for (int i = Nx - STENCIL - 2; i < Nx; i++) {
+            for(int j = 0; j < Nz; j++) {
+                u_next(i,j) = u_current(i,j) - cou*(u_current(i + 1,j) - u_current(i,j));
+            }
+        }
+
+        // * borda superior
+        //   du/dt - vel*du/dz = 0
+        // u(z, t+dt) = u(z,t) + cou * (u(z+dz,t) - u(z,t) )
+        for (int i = 0; i < Nx; i++) {
+            for(int j = 0; j < STENCIL + 1; j++) {
+                u_next(i,j) = u_current(i,j) + cou*(u_current(i,j + 1) - u_current(i,j));
+            }
+        }
+
+        // * borda inferior
+        //   du/dt - vel*du/dz = 0
+        // u(z, t+dt) = u(z,t) - cou * (u(z+dz,t) - u(z,t) )
+        for (int i = 0; i < Nx; i++) {
+            for(int j = Nz - STENCIL - 2; j < Nz; j++) {
+                u_next(i,j) = u_current(i,j) - cou*(u_current(i,j + 1) - u_current(i,j));
+            }
+        }
+        
+        // TODO: Essa troca de vetores pode ser evitada
+
         // troca u_next <--> u_current
         for (int i = STENCIL; i < Nx - STENCIL; i++){
             for (int j = STENCIL; j < Nz - STENCIL; j++){
@@ -199,7 +213,7 @@ int main() {
             }
         }
 
-        // *gera arquivo de dados a cada 500 iteracoes em k
+        // * gera arquivo de dados a cada 200 iteracoes em k
         if (k % 200 == 0){
             myfile.open(".././data" + to_string(k/200) + base);
             for (int i = 0; i < Nx; i++){
@@ -213,5 +227,6 @@ int main() {
         }
 
     }
-}
 
+    return 0;
+}
