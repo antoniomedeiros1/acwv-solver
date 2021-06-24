@@ -179,9 +179,9 @@ int main() {
         //   du/dt + vel*du/dx = 0
         // u(x, t+dt) = u(x,t) - cou * (u(x+dx,t) - u(x,t) )
         // ! Não esta sendo aplicada
-        for (int i = Nx - STENCIL - 2; i < Nx; i++) {
+        for (int i = Nx - STENCIL; i < Nx; i++) {
             for(int j = 0; j < Nz; j++) {
-                u_next(i,j) = u_current(i,j) - cou*(u_current(i + 1,j) - u_current(i,j));
+                u_next(i,j) = u_current(i,j) + cou*(u_current(i + 1,j) - u_current(i,j));
             }
         }
 
@@ -216,8 +216,8 @@ int main() {
         }
 
         // * gera arquivo de dados a cada 200 iteracoes em k
-        if (k % 200 == 0){
-            myfile.open(".././data" + to_string(k/200) + base);
+        if (k % 100 == 0){
+            myfile.open(".././data" + to_string(k/100) + base);
             for (int i = 0; i < Nx; i++){
                 for (int j = 0; j < Nz; j++)
                 {

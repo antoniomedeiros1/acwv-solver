@@ -15,6 +15,3 @@ Para evitar que aconteça reflexão da onda na borda do modelo é necessário ap
 A condição adotada foi a de amortecimento da onda nas bordas, isto é, para cada i no intervalo [0, d] e [X_max - d, X_max] e para cada
 j no intervalo [0, d] e [Z_max - d, Z_max] foi aplicada uma atenuação no valor de u para aquele ponto, que é proporcional à distância 
 do ponto até a borda do modelo. 
-
-## implementação
-
