@@ -12,9 +12,7 @@ Matriz2d::Matriz2d(int nl, int nc){
 
     std::memset(mat,0.0,size*sizeof(float));
 
-    //for (int i = 0; i < size; i++){
-    //    mat[i] = 0;
-    //}
+
 }
 
 Matriz2d::~Matriz2d(){
@@ -29,10 +27,10 @@ float Matriz2d::get(int i, int j)
 }
 
 void Matriz2d::set(int i, int j, float val){
-    mat[i*this->n_linhas + j] = val;
+    mat[i*this->n_cols + j] = val;
 }
 
 float& Matriz2d::operator()(int i, int j)
 {
-    return  mat[i*this->n_linhas + j];
+    return  mat[i*this->n_cols + j];
 }
