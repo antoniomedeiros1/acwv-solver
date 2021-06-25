@@ -169,20 +169,16 @@ int main() {
         // (u(x,t+dt) - u(x,t)) =   dt*(vel*(u(x+dx,t) - u(x,t))/dx
         // u(x, t+dt) = u(x,t) + cou * (u(x+dx,t) - u(x,t) )
         //    onde cou = dt*vel/dx
-        for (int i = 0; i <= STENCIL + 1; i++) {
-            for(int j = 0; j < Nz; j++) {
-                u_next(i,j) = u_current(i,j) + cou*(u_current(i + 1,j) - u_current(i,j));
-            }
+        for(int j = 0; j < Nz; j++) {
+            u_next(STENCIL,j) = u_current(STENCIL,j) + cou*(u_current(STENCIL + 1,j) - u_current(STENCIL,j));
         }
 
         // * borda direita
         //   du/dt + vel*du/dx = 0
         // u(x, t+dt) = u(x,t) - cou * (u(x+dx,t) - u(x,t) )
         // ! Não esta sendo aplicada
-        for (int i = Nx - STENCIL; i < Nx; i++) {
-            for(int j = 0; j < Nz; j++) {
-                u_next(i,j) = u_current(i,j) + cou*(u_current(i + 1,j) - u_current(i,j));
-            }
+        for(int j = 0; j < Nz; j++) {
+            u_next(Nx - STENCIL,j) = u_current(Nx - STENCIL,j) - cou*(u_current(Nx - STENCIL + 1, j) - u_current(Nx - STENCIL,j));
         }
 
         // * borda superior
@@ -200,7 +196,7 @@ int main() {
         // ! Não esta sendo aplicada
         for (int i = 0; i < Nx; i++) {
             for(int j = Nz - STENCIL - 2; j < Nz; j++) {
-                u_next(i,j) = u_current(i,j) - cou*(u_current(i,j + 1) - u_current(i,j));
+                u_next(i,j) = u_current(i,j) + cou*(u_current(i,j) - u_current(i,j + 1));
             }
         }
         
@@ -215,8 +211,9 @@ int main() {
             }
         }
 
-        // * gera arquivo de dados a cada 200 iteracoes em k
+        // * gera arquivo de dados a cada 100 iteracoes em k
         if (k % 100 == 0){
+            cout << "Gerando arquivo data" << to_string(k/100) + base << "..." << endl;
             myfile.open(".././data" + to_string(k/100) + base);
             for (int i = 0; i < Nx; i++){
                 for (int j = 0; j < Nz; j++)
@@ -229,6 +226,8 @@ int main() {
         }
 
     }
+
+    cout << "Arquivos gerados com sucesso!" << endl;
 
     return 0;
 }
