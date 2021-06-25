@@ -34,3 +34,15 @@ float& Matriz2d::operator()(int i, int j)
 {
     return  mat[i*this->n_cols + j];
 }
+
+
+void Matriz2d::swap(Matriz2d &orig)
+{
+    int size = this->n_cols*this->n_linhas;
+    for(int i = 0; i < size; i++)
+    {
+        float val    = this->mat[i];
+        this->mat[i] = orig.mat[i];
+        orig.mat[i]  = val;
+    }
+}

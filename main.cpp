@@ -205,15 +205,16 @@ int main() {
         }
         
         // TODO: Essa troca de vetores pode ser evitada
-
+        u_next.swap(u_current);
+        
         // troca u_next <--> u_current
-        for (int i = STENCIL; i < Nx - STENCIL; i++){
-            for (int j = STENCIL; j < Nz - STENCIL; j++){
-                val = u_next(i, j);
-                u_next(i, j)    = u_current(i, j);
-                u_current(i, j)=  val;
-            }
-        }
+        //for (int i = STENCIL; i < Nx - STENCIL; i++){
+        //    for (int j = STENCIL; j < Nz - STENCIL; j++){
+        //        val = u_next(i, j);
+        //        u_next(i, j)    = u_current(i, j);
+        //        u_current(i, j)=  val;
+        //    }
+        //}
 
         // * gera arquivo de dados a cada 200 iteracoes em k
         if (k % 100 == 0){
