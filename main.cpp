@@ -25,7 +25,7 @@ using namespace std;
 // 5. Implementar a camada de atenuação por borda. (implementado porem nao esta funcionando corretamente)
 // 6: Remover os ifs internos nas funções get de matriz3D e atenuação ✔
 // 7. Criar arquivo com funções de escrita e chamar a função dentro do laco do tempo. ✔
-// 8. Implementar uma estrutura ou classe para armazenar os parametros do problema
+// 8. Implementar uma estrutura ou classe para armazenar os parametros do problema ✔
 
 
 float fonte(int x, int z, float t, float fcorte, float xs, float zs){
@@ -169,29 +169,24 @@ int main() {
         // (u(x,t+dt) - u(x,t)) =   dt*(vel*(u(x+dx,t) - u(x,t))/dx
         // u(x, t+dt) = u(x,t) + cou * (u(x+dx,t) - u(x,t) )
         //    onde cou = dt*vel/dx
-        for (int i = 0; i <= STENCIL; i++) {
-            for(int j = 0; j < Nz; j++) {
-                u_next(i,j) = u_current(i,j) + cou*(u_current(i+1,j) - u_current(i,j));
-            }
+        for(int j = 0; j < Nz; j++) {
+            u_next(STENCIL,j) = u_current(STENCIL,j) + cou*(u_current(STENCIL+1,j) - u_current(STENCIL,j));
         }
 
         // * borda direita
         //   du/dt + vel*du/dx = 0
         // u(x, t+dt) = u(x,t) - cou * (u(x,t) - u(x-dt,t) )
         // Aqui usamos diferencas atrasadas para discretizar do espaco
-        for (int i = Nx-STENCIL-1; i < Nx; i++) {
-            for(int j = 0; j < Nz; j++) {
-                u_next(i,j) = u_current(i,j) - cou*(u_current(i,j) - u_current(i-1,j));
-            }
+        for(int j = 0; j < Nz; j++) {
+            u_next(Nx-STENCIL,j) = u_current(Nx-STENCIL,j) - cou*(u_current(Nx-STENCIL,j) - u_current(Nx-STENCIL-1,j));
         }
 
         // * borda superior
         //   du/dt - vel*du/dz = 0
         // u(z, t+dt) = u(z,t) + cou * (u(z+dz,t) - u(z,t) )
         for (int i = 0; i < Nx; i++) {
-            for(int j = 0; j <= STENCIL; j++) {
-                u_next(i,j) = u_current(i,j) + cou*(u_current(i,j+1) - u_current(i,j));
-            }
+            u_next(i,STENCIL) = u_current(i,STENCIL) + cou*(u_current(i,STENCIL+1) - u_current(i,STENCIL));
+            
         }
 
         // * borda inferior
@@ -199,22 +194,11 @@ int main() {
         // u(z, t+dt) = u(z,t) - cou * (u(z+dz,t) - u(z,t) )
         // ! Não esta sendo aplicada
         for (int i = 0; i < Nx; i++) {
-            for(int j = Nz-STENCIL-1; j < Nz; j++) {
-                u_next(i,j) = u_current(i,j) - cou*(u_current(i,j) - u_current(i,j-1));
-            }
+            u_next(i,Nz-STENCIL) = u_current(i,Nz-STENCIL) - cou*(u_current(i,Nz-STENCIL) - u_current(i,Nz-STENCIL - 1));
         }
         
         // TODO: Essa troca de vetores pode ser evitada
         u_next.swap(u_current);
-        
-        // troca u_next <--> u_current
-        //for (int i = STENCIL; i < Nx - STENCIL; i++){
-        //    for (int j = STENCIL; j < Nz - STENCIL; j++){
-        //        val = u_next(i, j);
-        //        u_next(i, j)    = u_current(i, j);
-        //        u_current(i, j)=  val;
-        //    }
-        //}
 
         // * gera arquivo de dados a cada 100 iteracoes em k
         if (k % 100 == 0){
