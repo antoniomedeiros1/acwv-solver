@@ -47,7 +47,7 @@ float fonte(int x, int z, float t, float fcorte, float xs, float zs){
 }
 
 float atenuacao(float d){
-    return pow(M_E, -1*pow(0.098*d, 2));
+    return pow(M_E, -1*pow(0.015*d, 2));
 }
 
 void geraArqGnuplot(Matriz2d u, int Nx, int Nz, int k, int modk, string base){
@@ -190,9 +190,8 @@ int main() {
         }
 
         // * borda inferior
-        //   du/dt - vel*du/dz = 0
-        // u(z, t+dt) = u(z,t) - cou * (u(z+dz,t) - u(z,t) )
-        // ! Não esta sendo aplicada
+        //   du/dt + vel*du/dz = 0
+        // u(z, t+dt) = u(z,t) - cou * (u(z,t) - u(z-dz,t) )
         for (int i = 0; i < Nx; i++) {
             u_next(i,Nz-STENCIL) = u_current(i,Nz-STENCIL) - cou*(u_current(i,Nz-STENCIL) - u_current(i,Nz-STENCIL - 1));
         }
@@ -207,7 +206,7 @@ int main() {
             for (int i = 0; i < Nx; i++){
                 for (int j = 0; j < Nz; j++)
                 {
-                    myfile << i << " " << j << " " << u_current(i, j) << "\n";
+                    myfile << i*dx << " " << j*dz << " " << u_current(i, j) << "\n";
                 }
                 myfile << "\n\n";
             }
