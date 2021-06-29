@@ -12,22 +12,6 @@
 
 using namespace std;
 
-// 1. Melhorar a estrutura do Codigo
-//   1.a: Utilize estrutura de diretorio do projeto:
-//        src/            --> todos os arquivos .cpp ✔
-//        include/        --> todos os arquivos .h ✔
-//        main.cpp ✔
-//        CMakeLists.txt  --> Arquivo de configuração de projeto qye usa Cmake. ✔
-// 2. Estudar https://cmake.org/ e gerar um scrip CMakeLists.txt para compilar ✔
-//       o código considerando a estrutura acima.
-// 3. Modificar o código para trabalhar apenas com dois/tres vetores. ✔
-// 4. Considerar o tamanho do stencil nos loops i,j ✔
-// 5. Implementar a camada de atenuação por borda. (implementado porem nao esta funcionando corretamente)
-// 6: Remover os ifs internos nas funções get de matriz3D e atenuação ✔
-// 7. Criar arquivo com funções de escrita e chamar a função dentro do laco do tempo. ✔
-// 8. Implementar uma estrutura ou classe para armazenar os parametros do problema ✔
-
-
 float fonte(int x, int z, float t, float fcorte, float xs, float zs){
 
     // *funcao que simula um pulso sismico na posicao (xs, zs)
@@ -47,7 +31,20 @@ float fonte(int x, int z, float t, float fcorte, float xs, float zs){
 }
 
 float atenuacao(float d){
-    return pow(M_E, -1*pow(0.015*d, 2));
+    return pow(M_E, -1*pow(0.15*d, 2));
+}
+
+int dist(int i, int j, int Nx, int Nz){
+
+    // * Essa funcao retorna a menor distancia em pontos entre o ponto (i, j) e as bordas 
+
+    int minX, minZ;
+
+    minX = min(i, Nx - i);
+    minZ = min(j, Nz - j);
+
+    return min(minX, minZ);
+
 }
 
 void geraArqGnuplot(Matriz2d u, int Nx, int Nz, int k, int modk, string base){
@@ -88,9 +85,8 @@ int main() {
     float cou = c*dt/dx;  // numero de courant, para dx = dz
     float c1 = (pow(cou, 2)/12.0); 
     float c2 = pow(c*dt, 2);
-    int borda = 20;       // largura da borda que sofrera a atenuacao
-    int d;                // distancia entre o no e o contorno
-    float atenuacoes[borda];  
+
+    // int borda = 20;       // largura da borda que sofrera a atenuacao
 
     float val; // variavel auxiliar 
 
@@ -106,14 +102,6 @@ int main() {
     cout << "Nt = " << Nt << endl;
     cout << "Numero de Courant = " << cou << endl;
 
-    // calcula o vetor de atenuacoes para evitar que o calculo seja realizada a cada iteracao na borda
-    // CHECK: verificar se o parametro de 
-    //   entrada dever ser multiplicado por dx
-    // ! Verifiquei no material e o parametro i eh a distancia em pontos, nao precisa multiplicar por dx
-    // for(int i = 0; i < borda; i++){
-    //     atenuacoes[i] = atenuacao(i);
-    // }
-
     // * MDF 
     // * o algoritmo segue a seguinte ordem:
     // *     1. inicializa duas matrizes zeradas u_current e u_next
@@ -127,6 +115,10 @@ int main() {
         for (int i = STENCIL; i <= Nx - STENCIL; i++){
             for (int j = STENCIL; j <= Nz - STENCIL; j++){
 
+                // if (dist(i, j, Nx, Nz) > borda){
+
+                // *calcula o MDF normalmente
+
                 val = 
                 c1 *
                 (
@@ -134,32 +126,34 @@ int main() {
                     16*(u_current(i - 1, j) + u_current(i, j - 1)) - 
                     60* u_current(i,     j) +
                     16*(u_current(i + 1, j) + u_current(i, j + 1)) -
-                       (u_current(i + 2, j) + u_current(i, j + 2)) 
+                    (u_current(i + 2, j) + u_current(i, j + 2)) 
                 ) 
                 + 2*u_current(i, j) - u_next(i, j) - c2 * fonte(i, j, k*dt, fcorte, xs, zs);
 
-                //u_next.set(i, j, val);
-
                 u_next(i,j) = val;
+
+                // } else {
+
+                //     // *calcula o MDF e aplica uma funcao de atenuacao 
+                //     val = 
+                //     (c1 *
+                //     (
+                //         -1*(u_current(i - 2, j) + u_current(i, j - 2)) + 
+                //         16*(u_current(i - 1, j) + u_current(i, j - 1)) - 
+                //         60* u_current(i,     j) +
+                //         16*(u_current(i + 1, j) + u_current(i, j + 1)) -
+                //         (u_current(i + 2, j) + u_current(i, j + 2)) 
+                //     ) 
+                //     + 2*u_current(i, j) - u_next(i, j));
+
+                //     val *= atenuacao(dist(i, j, Nx, Nz));
+
+                //     u_next(i,j) = val;
+
+                // }
+                
             }
         }
-
-        // percorre as bordas do modelo aplicando a atenuacao
-        // 
-        //     +-------------------+
-        //     |                   |
-        //     |                   |
-        //     |                   |
-        //     |                   |
-        //     |                   |
-        //     |                   |
-        //     +-------------------+
-        //
-        // for (int i = 0; i < borda; i++){
-        //     for(int j = 0; j < Nz; j++){
-        //         u_next(i, j) =  u_next(i, j) * atenuacao(j*dx);
-        //     }
-        // }
 
         // * Reynolds NR BC
 
