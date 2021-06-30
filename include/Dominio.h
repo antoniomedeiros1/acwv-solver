@@ -1,6 +1,6 @@
 #include <math.h>
 
-struct Domain {
+struct Dominio {
 
     float X;       // *Largura do dominio em m
     float Z;       // *Altura do dominio em m
