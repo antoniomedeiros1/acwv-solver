@@ -63,7 +63,7 @@ float fonte(int x, int z, float k, Dominio d){
 
     // *funcao que simula um pulso sismico na posicao (xs, zs)
 
-    if (x != d.xs/d.dx || z != d.zs/d.dz || k*d.dt > 0.5){
+    if (x*d.dx != d.xs || z*d.dz != d.zs || k*d.dt > 0.5){
         return 0;
     } 
 
@@ -126,7 +126,7 @@ void geraArqGnuplot(Dominio d, int k, int modk, string base, Matriz2d* u){
     myfile.open("../data" + to_string(k/modk) + base);
         for (int j = STENCIL; j < d.Nz - STENCIL; j++){
             for (int i = STENCIL; i < d.Nx - STENCIL; i++){
-                myfile << i << " " << j << " " << u->get(i, j) << "\n";
+                myfile << i*d.dz << " " << j*d.dx << " " << u->get(i, j) << "\n";
             }
             myfile << "\n\n";
         }
@@ -149,6 +149,8 @@ int main() {
     cout << "Nz = " << d.Nz << endl;
     cout << "Nt = " << d.Nt << endl;
     cout << "Numero de Courant = " << d.cou << endl;
+
+    auto inicio = chrono::high_resolution_clock::now();
 
     for (int k = 0; k <= d.Nt; k += 2){
 
@@ -201,7 +203,11 @@ int main() {
 
     }
 
-    cout << "Arquivos gerados com sucesso!" << endl;
+    cout << "\nArquivos gerados com sucesso!" << endl;
+
+    auto final = chrono::high_resolution_clock::now();
+    chrono::duration<double> intervalo = final - inicio;
+    cout << "\nTempo decorrido: " << intervalo.count() << "s\n";
 
     return 0;
 }
