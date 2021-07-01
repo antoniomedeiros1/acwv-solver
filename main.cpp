@@ -102,6 +102,44 @@ void mdf(Dominio d, Matriz2d* u_current, Matriz2d* u_next, int k){
 
 }
 
+void Reynolds(Dominio d, Matriz2d* u_current, Matriz2d* u_next){
+
+    // * Função que aplica a condição de contorno não-reflexiva de 
+
+    // * borda esquerda
+    //   du/dt - vel*du/dx = 0
+    // (u(x,t+dt) - u(x,t))/dt = vel*(u(x+dx,t) - u(x,t))/dx
+    // (u(x,t+dt) - u(x,t)) =   dt*(vel*(u(x+dx,t) - u(x,t))/dx
+    // u(x, t+dt) = u(x,t) + cou * (u(x+dx,t) - u(x,t) )
+    //    onde cou = dt*vel/dx
+    for(int j = 0; j < d.Nz; j++) {
+        u_next->set(STENCIL, j, u_current->get(STENCIL,j) + d.cou*(u_current->get(STENCIL+1,j) - u_current->get(STENCIL,j)));
+    }
+
+    // * borda direita
+    //   du/dt + vel*du/dx = 0
+    // u(x, t+dt) = u(x,t) - cou * (u(x,t) - u(x-dt,t) )
+    // Aqui usamos diferencas atrasadas para discretizar do espaco
+    for(int j = 0; j < d.Nz; j++) {
+        u_next->set(d.Nx-STENCIL, j, u_current->get(d.Nx-STENCIL,j) - d.cou*(u_current->get(d.Nx-STENCIL,j) - u_current->get(d.Nx-STENCIL-1,j)));
+    }
+
+    // * borda superior
+    //   du/dt - vel*du/dz = 0
+    // u(z, t+dt) = u(z,t) + cou * (u(z+dz,t) - u(z,t) )
+    for (int i = 0; i < d.Nx; i++) {
+        u_next->set(i, STENCIL, u_current->get(i,STENCIL) + d.cou*(u_current->get(i,STENCIL+1) - u_current->get(i,STENCIL)));
+    }
+
+    // * borda inferior
+    //   du/dt + vel*du/dz = 0
+    // u(z, t+dt) = u(z,t) - cou * (u(z,t) - u(z-dz,t) )
+    for (int i = 0; i < d.Nx; i++) {
+        u_next->set(i, d.Nz - STENCIL, u_current->get(i,d.Nz-STENCIL) - d.cou*(u_current->get(i,d.Nz-STENCIL) - u_current->get(i,d.Nz-STENCIL - 1)));
+    }
+
+}
+
 float atenuacao(float d){
 
     // * Função aplicada nas bordas para reduzir a amplitude da onda
@@ -156,44 +194,11 @@ int main() {
 
         // calcula u_next
         mdf(d, &u_current, &u_next, k);
-
-        // * Reynolds NR BC
-
-        // * borda esquerda
-        //   du/dt - vel*du/dx = 0
-        // (u(x,t+dt) - u(x,t))/dt = vel*(u(x+dx,t) - u(x,t))/dx
-        // (u(x,t+dt) - u(x,t)) =   dt*(vel*(u(x+dx,t) - u(x,t))/dx
-        // u(x, t+dt) = u(x,t) + cou * (u(x+dx,t) - u(x,t) )
-        //    onde cou = dt*vel/dx
-        for(int j = 0; j < d.Nz; j++) {
-            u_next(STENCIL,j) = u_current(STENCIL,j) + d.cou*(u_current(STENCIL+1,j) - u_current(STENCIL,j));
-        }
-
-        // * borda direita
-        //   du/dt + vel*du/dx = 0
-        // u(x, t+dt) = u(x,t) - cou * (u(x,t) - u(x-dt,t) )
-        // Aqui usamos diferencas atrasadas para discretizar do espaco
-        for(int j = 0; j < d.Nz; j++) {
-            u_next(d.Nx-STENCIL,j) = u_current(d.Nx-STENCIL,j) - d.cou*(u_current(d.Nx-STENCIL,j) - u_current(d.Nx-STENCIL-1,j));
-        }
-
-        // * borda superior
-        //   du/dt - vel*du/dz = 0
-        // u(z, t+dt) = u(z,t) + cou * (u(z+dz,t) - u(z,t) )
-        for (int i = 0; i < d.Nx; i++) {
-            u_next(i,STENCIL) = u_current(i,STENCIL) + d.cou*(u_current(i,STENCIL+1) - u_current(i,STENCIL));
-            
-        }
-
-        // * borda inferior
-        //   du/dt + vel*du/dz = 0
-        // u(z, t+dt) = u(z,t) - cou * (u(z,t) - u(z-dz,t) )
-        for (int i = 0; i < d.Nx; i++) {
-            u_next(i,d.Nz-STENCIL) = u_current(i,d.Nz-STENCIL) - d.cou*(u_current(i,d.Nz-STENCIL) - u_current(i,d.Nz-STENCIL - 1));
-        }
+        Reynolds(d, &u_current, &u_next);
         
         // calcula u_current
-        mdf(d, &u_next, &u_current, k);
+        mdf(d, &u_next, &u_current, k + 1);
+        Reynolds(d, &u_next, &u_current);
 
         // * gera arquivo de dados a cada 100 iteracoes em k
         if (k % 100 == 0){
