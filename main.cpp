@@ -5,7 +5,6 @@
 #include <fstream>
 #include <cmath>
 #include "math.h"
-#include <iomanip>
 #include <string>
 
 #include "Matriz2d.h"
@@ -14,6 +13,8 @@
 using namespace std;
 
 void leParametros(Dominio* d){
+
+    // * Função que lê os parâmetros da simulação
 
     ifstream myfile;
     myfile.open("../parametros.txt");
@@ -57,10 +58,6 @@ void leParametros(Dominio* d){
 
 }
 
-void mdf(){
-    // TODO: implementar funcao que calcula o u_next pelo u_current
-}
-
 float fonte(int x, int z, float t, float fcorte, float xs, float zs){
 
     // *funcao que simula um pulso sismico na posicao (xs, zs)
@@ -79,13 +76,45 @@ float fonte(int x, int z, float t, float fcorte, float xs, float zs){
 
 }
 
+void mdf(Dominio d, Matriz2d* u_current, Matriz2d* u_next, int k){
+
+    // * Função que calcula o u_next pelo u_current
+
+    float val;
+
+    for (int i = STENCIL; i <= d.Nx - STENCIL; i++){
+        
+        for (int j = STENCIL; j <= d.Nz - STENCIL; j++){
+
+            val = 
+            d.c1 *
+            (
+                -1*(u_current->get(i - 2, j) + u_current->get(i, j - 2)) + 
+                16*(u_current->get(i - 1, j) + u_current->get(i, j - 1)) - 
+                60* u_current->get(i,     j) +
+                16*(u_current->get(i + 1, j) + u_current->get(i, j + 1)) -
+                (u_current->get(i + 2, j) + u_current->get(i, j + 2)) 
+            ) 
+            + 2*u_current->get(i, j) - u_next->get(i, j) - d.c2 * fonte(i, j, k*d.dt, d.fcorte, d.xs/d.dx, d.zs/d.dz);
+
+            u_next->set(i,j, val);
+            
+        }
+    }
+
+}
+
 float atenuacao(float d){
+
+    // * Função aplicada nas bordas para reduzir a amplitude da onda
+
     return pow(M_E, -1*pow(0.15*d, 2));
+
 }
 
 int dist(int i, int j, int Nx, int Nz){
 
-    // * Essa funcao retorna a menor distancia em pontos entre o ponto (i, j) e as bordas 
+    // * Essa funcao retorna a menor distancia em pontos entre o ponto (i, j) e o contorno 
 
     int minX, minZ;
 
@@ -126,64 +155,15 @@ int main() {
     ofstream myfile;    
     string base(".dat");
 
-    // *imprime os parametros 
     cout << "Nx = " << d.Nx << endl;
     cout << "Nz = " << d.Nz << endl;
     cout << "Nt = " << d.Nt << endl;
     cout << "Numero de Courant = " << d.cou << endl;
 
-    // * MDF 
-    // * o algoritmo segue a seguinte ordem:
-    // *     1. inicializa duas matrizes zeradas u_current e u_next
-    // *     2. calcula u_next a partir dos valores da u_current pelo MDF
-    // *     3. percorre as bordas aplicando uma funcao de atenuacao do valor para evitar a reflexao
-    // *     4. u_current passa a ser u_next e u_next recebe os valores anteriores de u_current
-    // *     5. gera um arquivo de dados para plot a cada x iteracoes no tempo
-    for (int k = 0; k <= d.Nt; k++){
+    for (int k = 0; k <= d.Nt; k += 2){
 
         // calcula u_next
-        for (int i = STENCIL; i <= d.Nx - STENCIL; i++){
-            for (int j = STENCIL; j <= d.Nz - STENCIL; j++){
-
-                // if (dist(i, j, Nx, Nz) > borda){
-
-                // *calcula o MDF normalmente
-
-                val = 
-                d.c1 *
-                (
-                    -1*(u_current(i - 2, j) + u_current(i, j - 2)) + 
-                    16*(u_current(i - 1, j) + u_current(i, j - 1)) - 
-                    60* u_current(i,     j) +
-                    16*(u_current(i + 1, j) + u_current(i, j + 1)) -
-                    (u_current(i + 2, j) + u_current(i, j + 2)) 
-                ) 
-                + 2*u_current(i, j) - u_next(i, j) - d.c2 * fonte(i, j, k*d.dt, d.fcorte, d.xs, d.zs);
-
-                u_next(i,j) = val;
-
-                // } else {
-
-                //     // *calcula o MDF e aplica uma funcao de atenuacao 
-                //     val = 
-                //     (c1 *
-                //     (
-                //         -1*(u_current(i - 2, j) + u_current(i, j - 2)) + 
-                //         16*(u_current(i - 1, j) + u_current(i, j - 1)) - 
-                //         60* u_current(i,     j) +
-                //         16*(u_current(i + 1, j) + u_current(i, j + 1)) -
-                //         (u_current(i + 2, j) + u_current(i, j + 2)) 
-                //     ) 
-                //     + 2*u_current(i, j) - u_next(i, j));
-
-                //     val *= atenuacao(dist(i, j, Nx, Nz));
-
-                //     u_next(i,j) = val;
-
-                // }
-                
-            }
-        }
+        mdf(d, &u_current, &u_next, k);
 
         // * Reynolds NR BC
 
@@ -220,8 +200,8 @@ int main() {
             u_next(i,d.Nz-STENCIL) = u_current(i,d.Nz-STENCIL) - d.cou*(u_current(i,d.Nz-STENCIL) - u_current(i,d.Nz-STENCIL - 1));
         }
         
-        // TODO: Essa troca de vetores pode ser evitada
-        u_next.swap(u_current);
+        // calcula u_current
+        mdf(d, &u_next, &u_current, k);
 
         // * gera arquivo de dados a cada 100 iteracoes em k
         if (k % 100 == 0){

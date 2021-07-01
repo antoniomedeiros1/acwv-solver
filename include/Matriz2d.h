@@ -14,9 +14,7 @@ class Matriz2d{
         float get(int i, int j);
         void set(int i, int j, float val);
         void swap(Matriz2d &orig);
-
-        // Veja como podemos usar sobrecarga de operadores.
-        float& operator()(int i, int j);
+        float& operator()(int i, int j); // utilizando sobrecarga de operadores
 
     private:
         int n_linhas;
