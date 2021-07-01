@@ -6,6 +6,7 @@
 #include <cmath>
 #include "math.h"
 #include <string>
+#include <chrono>
 
 #include "Matriz2d.h"
 #include "Dominio.h"
@@ -58,21 +59,18 @@ void leParametros(Dominio* d){
 
 }
 
-float fonte(int x, int z, float t, float fcorte, float xs, float zs){
+float fonte(int x, int z, float k, Dominio d){
 
     // *funcao que simula um pulso sismico na posicao (xs, zs)
 
-    float td = t - ((2*sqrt(M_PI))/fcorte);  
-    float fc = (fcorte/(3*sqrt(M_PI)));
-
-    if (x != xs || z != zs){
+    if (x != d.xs/d.dx || z != d.zs/d.dz || k*d.dt > 0.5){
         return 0;
     } 
 
-    float eq1 = (1.0 - 2.0 * M_PI * pow(M_PI * fc * td, 2));
-    float eq2 = pow(M_E, M_PI*pow((M_PI*fc*td), 2));
+    float td = k*d.dt - ((2*sqrt(M_PI))/d.fcorte);  
+    float fc = (d.fcorte/(3*sqrt(M_PI)));
 
-    return eq1/eq2;
+    return (1.0 - 2.0 * M_PI * pow(M_PI * fc * td, 2))/pow(M_E, M_PI*pow((M_PI*fc*td), 2));
 
 }
 
@@ -93,9 +91,9 @@ void mdf(Dominio d, Matriz2d* u_current, Matriz2d* u_next, int k){
                 16*(u_current->get(i - 1, j) + u_current->get(i, j - 1)) - 
                 60* u_current->get(i,     j) +
                 16*(u_current->get(i + 1, j) + u_current->get(i, j + 1)) -
-                (u_current->get(i + 2, j) + u_current->get(i, j + 2)) 
+                   (u_current->get(i + 2, j) + u_current->get(i, j + 2)) 
             ) 
-            + 2*u_current->get(i, j) - u_next->get(i, j) - d.c2 * fonte(i, j, k*d.dt, d.fcorte, d.xs/d.dx, d.zs/d.dz);
+            + 2*u_current->get(i, j) - u_next->get(i, j) - d.c2 * fonte(i, j, k, d);
 
             u_next->set(i,j, val);
             
@@ -112,29 +110,23 @@ float atenuacao(float d){
 
 }
 
-int dist(int i, int j, int Nx, int Nz){
+int dist(int i, int j, Dominio d){
 
-    // * Essa funcao retorna a menor distancia em pontos entre o ponto (i, j) e o contorno 
+    // * Função que retorna a menor distancia em pontos entre o ponto (i, j) e o contorno 
 
-    int minX, minZ;
-
-    minX = min(i, Nx - i);
-    minZ = min(j, Nz - j);
-
-    return min(minX, minZ);
+    return min(min(i, d.Nx - i), min(j, d.Nz - j));
 
 }
 
-void geraArqGnuplot(Matriz2d u, int Nx, int Nz, int k, int modk, string base){
+void geraArqGnuplot(Dominio d, int k, int modk, string base, Matriz2d* u){
 
-    // *essa funcao gera um arquivo de dados para plotar pelo GnuPlot
-    // ! erro: core dump
+    // * Função que gera um arquivo de dados no formato aceito pelo GNUPlot
 
     ofstream myfile;
-    myfile.open("data" + to_string(k/modk) + base);
-        for (int j = 0; j < Nz; j++){
-            for (int i = 0; i < Nx; i++){
-                myfile << i << " " << j << " " << u.get(i, j) << "\n";
+    myfile.open("../data" + to_string(k/modk) + base);
+        for (int j = STENCIL; j < d.Nz - STENCIL; j++){
+            for (int i = STENCIL; i < d.Nx - STENCIL; i++){
+                myfile << i << " " << j << " " << u->get(i, j) << "\n";
             }
             myfile << "\n\n";
         }
@@ -146,8 +138,6 @@ int main() {
 
     Dominio d;
     leParametros(&d);
-
-    float val; // variavel auxiliar 
 
     Matriz2d u_current(d.Nx, d.Nz);
     Matriz2d u_next(d.Nx, d.Nz);
@@ -206,15 +196,7 @@ int main() {
         // * gera arquivo de dados a cada 100 iteracoes em k
         if (k % 100 == 0){
             cout << "Gerando arquivo data" << to_string(k/100) + base << "..." << endl;
-            myfile.open(".././data" + to_string(k/100) + base);
-            for (int i = 0; i < d.Nx; i++){
-                for (int j = 0; j < d.Nz; j++)
-                {
-                    myfile << i*d.dx << " " << j*d.dz << " " << u_current(i, j) << "\n";
-                }
-                myfile << "\n\n";
-            }
-            myfile.close();
+            geraArqGnuplot(d, k, 100, base, &u_current);
         }
 
     }
