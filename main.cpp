@@ -194,8 +194,8 @@ void salvaVTI(Dominio d, int k, int modk, Matriz2d* u){
         myfile << "    <Piece Extent = \"" << 0 << " " << d.Nx - 1 << " " << 0 << " " << d.Nz - 1 << " " << 0 << " " << 0 << "\">\n";
         myfile << "      <PointData Scalars=\"Amplitude\">\n";
         myfile << "        <DataArray type=\"Float32\" Name=\"Amplitude\" format=\"ascii\">\n";
-        for (int i = 0; i < d.Nx; i++){
-            for (int j = 0; j < d.Nz; j++){
+        for (int j = 0; j < d.Nx; j++){
+            for (int i = 0; i < d.Nz; i++){
                 myfile << u->get(i, j) << " ";
             }
         }
@@ -236,7 +236,7 @@ int main() {
         
         // calcula u_current
         mdf(d, &u_next, &u_current, k + 1);
-        Reynolds(d, &u_next, &u_current);
+        // Reynolds(d, &u_next, &u_current);
 
         // * gera arquivo de dados a cada 100 iteracoes em k
         if (k % 100 == 0){
