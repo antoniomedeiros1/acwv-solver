@@ -156,11 +156,14 @@ int dist(int i, int j, Dominio d){
 
 }
 
-void geraArqGnuplot(Dominio d, int k, int modk, string base, Matriz2d* u){
+void salvaGNUPlot(Dominio d, int k, int modk, string base, Matriz2d* u){
 
     // * Função que gera um arquivo de dados no formato aceito pelo GNUPlot
 
     ofstream myfile;
+
+    cout << "Gerando arquivo data" << to_string(k/100) + base << "..." << endl;
+
     myfile.open("../data" + to_string(k/modk) + base);
         for (int j = STENCIL; j < d.Nz - STENCIL; j++){
             for (int i = STENCIL; i < d.Nx - STENCIL; i++){
@@ -171,6 +174,42 @@ void geraArqGnuplot(Dominio d, int k, int modk, string base, Matriz2d* u){
     myfile.close();
 }
 
+void salvaVTI(Dominio d, int k, int modk, Matriz2d* u){
+
+    // * Função que gera um arquivo vtk ImageData para o ParaView
+
+    ofstream myfile;
+
+    cout << "Gerando arquivo data" << to_string(k/100) << ".vti" << "..." << endl;
+
+    myfile.open("../data" + to_string(k/modk) + ".vti");
+
+    if(myfile.is_open()){
+
+        myfile << "<VTKFile type=\"ImageData\" version=\"0.1\" byte_order=\"LittleEndian\">\n";
+        //                                          x1            x2          y1            y2
+        myfile << "  <ImageData WholeExtent= \"" <<  0 << " " << d.X << " " << 0 << " " << d.Z << "\" ";
+        myfile << "Origin = \"" << 0 << " " << 0 << "\" ";
+        myfile << "Spacing = \"" << d.dx << " " << d.dz << "\">\n";
+        myfile << "    <Piece Extent = \"" << 0 << " " << d.X << " " << 0 << " " << d.Z << "\">\n";
+        myfile << "      <PointData Scalars=\"Amplitude\">\n";
+        myfile << "        <DataArray type=\"Float32\" Name=\"amplitude\" format=\"ascii\">\n";
+        for (int i = 0; i < d.Nx; i++){
+            for (int j = 0; j < d.Nz; j++){
+                myfile << u->get(i, j) << " ";
+            }
+        }
+        myfile << "\n        </DataArray>";
+        myfile << "\n      </PointData>";
+        myfile << "\n    </Piece>";
+        myfile << "\n  </ImageData>";
+        myfile << "\n</VTKFile>";
+
+    } else {
+        cout << "Erro na gravação do arquivo data" << to_string(k/modk) << ".vti" << endl;
+    }
+
+}
 
 int main() {
 
@@ -179,8 +218,7 @@ int main() {
 
     Matriz2d u_current(d.Nx, d.Nz);
     Matriz2d u_next(d.Nx, d.Nz);
-
-    ofstream myfile;    
+    
     string base(".dat");
 
     cout << "Nx = " << d.Nx << endl;
@@ -202,8 +240,8 @@ int main() {
 
         // * gera arquivo de dados a cada 100 iteracoes em k
         if (k % 100 == 0){
-            cout << "Gerando arquivo data" << to_string(k/100) + base << "..." << endl;
-            geraArqGnuplot(d, k, 100, base, &u_current);
+            //salvaGNUPlot(d, k, 100, base, &u_current);
+            salvaVTI(d, k, 100, &u_current);
         }
 
     }
