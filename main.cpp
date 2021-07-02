@@ -188,10 +188,10 @@ void salvaVTI(Dominio d, int k, int modk, Matriz2d* u){
 
         myfile << "<VTKFile type=\"ImageData\" version=\"0.1\" byte_order=\"LittleEndian\">\n";
         //                                          x1            x2          y1            y2          z1          z2
-        myfile << "  <ImageData WholeExtent= \"" <<  0 << " " << d.Nx << " " << 0 << " " << d.Nz << " " << 0 << " " << 0 << "\" ";
+        myfile << "  <ImageData WholeExtent= \"" <<  0 << " " << d.Nx - 1 << " " << 0 << " " << d.Nz - 1 << " " << 0 << " " << 0 << "\" ";
         myfile << "Origin = \"" << 0 << " " << 0 << " " << 0 << "\" ";
         myfile << "Spacing = \"" << d.dx << " " << d.dz << " " << 0 << "\">\n";
-        myfile << "    <Piece Extent = \"" << 0 << " " << d.Nx << " " << 0 << " " << d.Nz << " " << 0 << " " << 0 << "\">\n";
+        myfile << "    <Piece Extent = \"" << 0 << " " << d.Nx - 1 << " " << 0 << " " << d.Nz - 1 << " " << 0 << " " << 0 << "\">\n";
         myfile << "      <PointData Scalars=\"Amplitude\">\n";
         myfile << "        <DataArray type=\"Float32\" Name=\"Amplitude\" format=\"ascii\">\n";
         for (int i = 0; i < d.Nx; i++){
@@ -201,8 +201,6 @@ void salvaVTI(Dominio d, int k, int modk, Matriz2d* u){
         }
         myfile << "\n        </DataArray>";
         myfile << "\n      </PointData>";
-        myfile << "\n      <CellData>";
-        myfile << "\n      </CellData>";
         myfile << "\n    </Piece>";
         myfile << "\n  </ImageData>";
         myfile << "\n</VTKFile>";
