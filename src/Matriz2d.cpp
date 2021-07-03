@@ -23,7 +23,7 @@ Matriz2d::~Matriz2d(){
 // Modifiquei o acesso ao vetor para melhorar e eficiencia.
 float Matriz2d::get(int i, int j)
 {
-    return mat[i*this->n_linhas + j];
+    return mat[i*this->n_cols + j];
 }
 
 void Matriz2d::set(int i, int j, float val){

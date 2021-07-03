@@ -7,6 +7,6 @@ set yrange [A_max_y:A_min_y]
 set cbrange [-3:3]
 set palette rgb 21,22,23
 set output 'plot1.gif'  
-set term gif animate delay 6
-do for [i=0:39] {plot 'data'.i.'.dat' with image}
+set term gif animate delay 3
+do for [i=0:79] {plot 'data'.i.'.dat' with image}
 unset output
