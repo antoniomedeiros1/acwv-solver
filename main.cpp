@@ -140,13 +140,12 @@ void Reynolds(Dominio d, Matriz2d* u_current, Matriz2d* u_next){
 
 }
 
-float atenuacao(float d){
+float atenuacao(float x, int borda){
 
     // * Função aplicada nas bordas para reduzir a amplitude da onda
 
-    float fat = 0.001;
-
-    return pow(M_E, -1*pow(fat*d, 2));
+    float fat = 0.00005;
+    return exp(-(fat*pow(borda - x, 2)));
 
 }
 
@@ -163,11 +162,11 @@ void mdfComAbsorcao(Dominio d, Matriz2d* u_current, Matriz2d* u_next, int k){
     // * Função que calcula o u_next pelo u_current
 
     float val;
-    int borda = 20 + STENCIL;
+    int borda = 20;
 
 
-    // percorre a borda superior
-    for(int i = STENCIL; i < d.Nx - STENCIL; i++){
+    // percorre a faixa superior
+    for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
         for(int j = STENCIL; j < borda; j++){
 
             val = 
@@ -181,7 +180,29 @@ void mdfComAbsorcao(Dominio d, Matriz2d* u_current, Matriz2d* u_next, int k){
             ) 
             + 2*u_current->get(i, j) - u_next->get(i, j);
 
-            val *= atenuacao(borda - j);
+            val *= atenuacao(j, borda);
+
+            u_next->set(i,j, val);
+            
+        }
+    }
+
+    // percorre a faixa esquerda
+    for(int i = STENCIL; i < borda; i++){
+        for(int j = borda; j < d.Nz - borda; j++){
+
+            val = 
+            d.c1 *
+            (
+                -1*(u_current->get(i - 2, j) + u_current->get(i, j - 2)) + 
+                16*(u_current->get(i - 1, j) + u_current->get(i, j - 1)) - 
+                60* u_current->get(i,     j) +
+                16*(u_current->get(i + 1, j) + u_current->get(i, j + 1)) -
+                   (u_current->get(i + 2, j) + u_current->get(i, j + 2)) 
+            ) 
+            + 2*u_current->get(i, j) - u_next->get(i, j);
+
+            val *= atenuacao(i, borda);
 
             u_next->set(i,j, val);
             
@@ -189,8 +210,8 @@ void mdfComAbsorcao(Dominio d, Matriz2d* u_current, Matriz2d* u_next, int k){
     }
 
     // percorre o miolo
-    for(int i = borda; i < d.Nz - borda; i++){
-        for(int j = borda; j < d.Nx - borda; j++){
+    for(int i = borda; i < d.Nx - borda; i++){
+        for(int j = borda; j < d.Nz - borda; j++){
 
             val = 
             d.c1 *
@@ -208,6 +229,50 @@ void mdfComAbsorcao(Dominio d, Matriz2d* u_current, Matriz2d* u_next, int k){
         }
     }
 
+    // percorre a faixa direita
+    for(int i = d.Nx - borda; i <= d.Nx - STENCIL; i++){
+        for(int j = borda; j < d.Nz - borda; j++){
+
+            val = 
+            d.c1 *
+            (
+                -1*(u_current->get(i - 2, j) + u_current->get(i, j - 2)) + 
+                16*(u_current->get(i - 1, j) + u_current->get(i, j - 1)) - 
+                60* u_current->get(i,     j) +
+                16*(u_current->get(i + 1, j) + u_current->get(i, j + 1)) -
+                   (u_current->get(i + 2, j) + u_current->get(i, j + 2)) 
+            ) 
+            + 2*u_current->get(i, j) - u_next->get(i, j);
+
+            val *= atenuacao((d.Nx - i), borda);
+
+            u_next->set(i,j, val);
+            
+        }
+    }
+    
+    // percorre a faixa inferior
+    for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
+        for(int j = d.Nz - borda; j <= d.Nz - STENCIL; j++){
+
+            val = 
+            d.c1 *
+            (
+                -1*(u_current->get(i - 2, j) + u_current->get(i, j - 2)) + 
+                16*(u_current->get(i - 1, j) + u_current->get(i, j - 1)) - 
+                60* u_current->get(i,     j) +
+                16*(u_current->get(i + 1, j) + u_current->get(i, j + 1)) -
+                   (u_current->get(i + 2, j) + u_current->get(i, j + 2)) 
+            ) 
+            + 2*u_current->get(i, j) - u_next->get(i, j);
+
+            val *= atenuacao(d.Nz - j, borda);
+
+            u_next->set(i,j, val);
+            
+        }
+    }
+
 }
 
 void salvaGNUPlot(Dominio d, int k, int modk, string base, Matriz2d* u){
@@ -216,7 +281,7 @@ void salvaGNUPlot(Dominio d, int k, int modk, string base, Matriz2d* u){
 
     ofstream myfile;
 
-    cout << "Gerando arquivo data" << to_string(k/100) + base << "..." << endl;
+    cout << "Gerando arquivo data" << to_string(k/modk) + base << "..." << endl;
 
     myfile.open("../data" + to_string(k/modk) + base);
         for (int j = STENCIL; j < d.Nz - STENCIL; j++){
@@ -267,13 +332,16 @@ void salvaVTI(Dominio d, int k, int modk, Matriz2d* u){
 
 int main() {
 
+    // inicializa os parametros da simulação
     Dominio d;
     leParametros(&d);
 
+    // é necessária a utilização de apenas duas matrizes para implementar o método de diferenças finitas
     Matriz2d u_current(d.Nx, d.Nz);
     Matriz2d u_next(d.Nx, d.Nz);
     
     string base(".dat");
+    int modk = 50;
 
     cout << "Nx = " << d.Nx << endl;
     cout << "Nz = " << d.Nz << endl;
@@ -285,17 +353,17 @@ int main() {
     for (int k = 0; k <= d.Nt; k += 2){
 
         // calcula u_next
-        mdf(d, &u_current, &u_next, k);
+        mdfComAbsorcao(d, &u_current, &u_next, k);
         Reynolds(d, &u_current, &u_next);
         
         // calcula u_current
-        mdf(d, &u_next, &u_current, k + 1);
+        mdfComAbsorcao(d, &u_next, &u_current, k + 1);
         // Reynolds(d, &u_next, &u_current);
 
         // * gera arquivo de dados a cada 100 iteracoes em k
-        if (k % 50 == 0){
-            //salvaGNUPlot(d, k, 100, base, &u_current);
-            salvaVTI(d, k, 50, &u_current);
+        if (k % modk == 0){
+            // salvaGNUPlot(d, k, modk, base, &u_current);
+            salvaVTI(d, k, modk, &u_current);
         }
 
     }
