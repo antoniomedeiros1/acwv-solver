@@ -144,18 +144,11 @@ float atenuacao(float x, int borda){
 
     // * Função aplicada nas bordas para reduzir a amplitude da onda
 
-    float fat = 0.00005;
-    return exp(-(fat*pow(borda - x, 2)));
+    float fat = 0.015;
+    return exp(-(pow(fat*(borda - x), 2)));
 
 }
 
-int dist(int i, int j, Dominio d){
-
-    // * Função que retorna a menor distancia em pontos entre o ponto (i, j) e o contorno 
-
-    return min(min(i, d.Nx - i), min(j, d.Nz - j));
-
-}
 
 void mdfComAbsorcao(Dominio d, Matriz2d* u_current, Matriz2d* u_next, int k){
 
@@ -164,31 +157,30 @@ void mdfComAbsorcao(Dominio d, Matriz2d* u_current, Matriz2d* u_next, int k){
     float val;
     int borda = 20;
 
+    // // percorre a faixa superior
+    // for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
+    //     for(int j = STENCIL; j < borda; j++){
 
-    // percorre a faixa superior
-    for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
-        for(int j = STENCIL; j < borda; j++){
+    //         val = 
+    //         d.c1 *
+    //         (
+    //             -1*(u_current->get(i - 2, j) + u_current->get(i, j - 2)) + 
+    //             16*(u_current->get(i - 1, j) + u_current->get(i, j - 1)) - 
+    //             60* u_current->get(i,     j) +
+    //             16*(u_current->get(i + 1, j) + u_current->get(i, j + 1)) -
+    //                (u_current->get(i + 2, j) + u_current->get(i, j + 2)) 
+    //         ) 
+    //         + 2*u_current->get(i, j) - u_next->get(i, j);
 
-            val = 
-            d.c1 *
-            (
-                -1*(u_current->get(i - 2, j) + u_current->get(i, j - 2)) + 
-                16*(u_current->get(i - 1, j) + u_current->get(i, j - 1)) - 
-                60* u_current->get(i,     j) +
-                16*(u_current->get(i + 1, j) + u_current->get(i, j + 1)) -
-                   (u_current->get(i + 2, j) + u_current->get(i, j + 2)) 
-            ) 
-            + 2*u_current->get(i, j) - u_next->get(i, j);
+    //         val *= atenuacao(j, borda);
 
-            val *= atenuacao(j, borda);
-
-            u_next->set(i,j, val);
+    //         u_next->set(i,j, val);
             
-        }
-    }
+    //     }
+    // }
 
     // percorre a faixa esquerda
-    for(int i = STENCIL; i < borda; i++){
+    for(int i = STENCIL; i <= borda; i++){
         for(int j = borda; j < d.Nz - borda; j++){
 
             val = 
@@ -210,7 +202,7 @@ void mdfComAbsorcao(Dominio d, Matriz2d* u_current, Matriz2d* u_next, int k){
     }
 
     // percorre o miolo
-    for(int i = borda; i < d.Nx - borda; i++){
+    for(int i = borda + 1; i < d.Nx - borda; i++){
         for(int j = borda; j < d.Nz - borda; j++){
 
             val = 
@@ -229,49 +221,49 @@ void mdfComAbsorcao(Dominio d, Matriz2d* u_current, Matriz2d* u_next, int k){
         }
     }
 
-    // percorre a faixa direita
-    for(int i = d.Nx - borda; i <= d.Nx - STENCIL; i++){
-        for(int j = borda; j < d.Nz - borda; j++){
+    // // percorre a faixa direita
+    // for(int i = d.Nx - borda; i <= d.Nx - STENCIL; i++){
+    //     for(int j = borda; j < d.Nz - borda; j++){
 
-            val = 
-            d.c1 *
-            (
-                -1*(u_current->get(i - 2, j) + u_current->get(i, j - 2)) + 
-                16*(u_current->get(i - 1, j) + u_current->get(i, j - 1)) - 
-                60* u_current->get(i,     j) +
-                16*(u_current->get(i + 1, j) + u_current->get(i, j + 1)) -
-                   (u_current->get(i + 2, j) + u_current->get(i, j + 2)) 
-            ) 
-            + 2*u_current->get(i, j) - u_next->get(i, j);
+    //         val = 
+    //         d.c1 *
+    //         (
+    //             -1*(u_current->get(i - 2, j) + u_current->get(i, j - 2)) + 
+    //             16*(u_current->get(i - 1, j) + u_current->get(i, j - 1)) - 
+    //             60* u_current->get(i,     j) +
+    //             16*(u_current->get(i + 1, j) + u_current->get(i, j + 1)) -
+    //                (u_current->get(i + 2, j) + u_current->get(i, j + 2)) 
+    //         ) 
+    //         + 2*u_current->get(i, j) - u_next->get(i, j);
 
-            val *= atenuacao((d.Nx - i), borda);
+    //         val *= atenuacao((d.Nx - i), borda);
 
-            u_next->set(i,j, val);
+    //         u_next->set(i,j, val);
             
-        }
-    }
+    //     }
+    // }
     
-    // percorre a faixa inferior
-    for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
-        for(int j = d.Nz - borda; j <= d.Nz - STENCIL; j++){
+    // // percorre a faixa inferior
+    // for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
+    //     for(int j = d.Nz - borda; j <= d.Nz - STENCIL; j++){
 
-            val = 
-            d.c1 *
-            (
-                -1*(u_current->get(i - 2, j) + u_current->get(i, j - 2)) + 
-                16*(u_current->get(i - 1, j) + u_current->get(i, j - 1)) - 
-                60* u_current->get(i,     j) +
-                16*(u_current->get(i + 1, j) + u_current->get(i, j + 1)) -
-                   (u_current->get(i + 2, j) + u_current->get(i, j + 2)) 
-            ) 
-            + 2*u_current->get(i, j) - u_next->get(i, j);
+    //         val = 
+    //         d.c1 *
+    //         (
+    //             -1*(u_current->get(i - 2, j) + u_current->get(i, j - 2)) + 
+    //             16*(u_current->get(i - 1, j) + u_current->get(i, j - 1)) - 
+    //             60* u_current->get(i,     j) +
+    //             16*(u_current->get(i + 1, j) + u_current->get(i, j + 1)) -
+    //                (u_current->get(i + 2, j) + u_current->get(i, j + 2)) 
+    //         ) 
+    //         + 2*u_current->get(i, j) - u_next->get(i, j);
 
-            val *= atenuacao(d.Nz - j, borda);
+    //         val *= atenuacao(d.Nz - j, borda);
 
-            u_next->set(i,j, val);
+    //         u_next->set(i,j, val);
             
-        }
-    }
+    //     }
+    // }
 
 }
 
@@ -299,7 +291,7 @@ void salvaVTI(Dominio d, int k, int modk, Matriz2d* u){
 
     ofstream myfile;
 
-    cout << "Gerando arquivo data" << to_string(k/modk) << ".vti" << "..." << endl;
+    // cout << "Gerando arquivo data" << to_string(k/modk) << ".vti" << "..." << endl;
 
     myfile.open("../data" + to_string(k/modk) + ".vti");
 
@@ -355,10 +347,12 @@ int main() {
         // calcula u_next
         mdfComAbsorcao(d, &u_current, &u_next, k);
         Reynolds(d, &u_current, &u_next);
+        // camadasDeAbsorcao(d, &u_next);
         
         // calcula u_current
         mdfComAbsorcao(d, &u_next, &u_current, k + 1);
-        // Reynolds(d, &u_next, &u_current);
+        Reynolds(d, &u_next, &u_current);
+        // camadasDeAbsorcao(d, &u_current);
 
         // * gera arquivo de dados a cada 100 iteracoes em k
         if (k % modk == 0){
