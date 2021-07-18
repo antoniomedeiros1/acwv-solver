@@ -228,15 +228,14 @@ void salvaVTI(Dominio d, int k, int modk, Matriz2d* u){
     if(myfile.is_open()){
 
         myfile << "<VTKFile type=\"ImageData\" version=\"0.1\" byte_order=\"LittleEndian\">\n";
-        //                                          x1            x2          y1            y2          z1          z2
-        myfile << "  <ImageData WholeExtent= \"" <<  0 << " " << d.Nx - 1 << " " << 0 << " " << d.Nz - 1 << " " << 0 << " " << 0 << "\" ";
-        myfile << "Origin = \"" << 0 << " " << 0 << " " << 0 << "\" ";
+        myfile << "  <ImageData WholeExtent= \"" <<  STENCIL << " " << d.Nx - 1 - STENCIL << " " << STENCIL << " " << d.Nz - 1 - STENCIL << " " << 0 << " " << 0 << "\" ";
+        myfile << "Origin = \"" << STENCIL << " " << d.Nz - 1 << " " << 0 << "\" ";
         myfile << "Spacing = \"" << d.dx << " " << d.dz << " " << 0 << "\">\n";
-        myfile << "    <Piece Extent = \"" << 0 << " " << d.Nx - 1 << " " << 0 << " " << d.Nz - 1 << " " << 0 << " " << 0 << "\">\n";
+        myfile << "    <Piece Extent = \"" << STENCIL << " " << d.Nx - 1 - STENCIL << " " << STENCIL << " " << d.Nz - 1 - STENCIL << " " << 0 << " " << 0 << "\">\n";
         myfile << "      <PointData Scalars=\"Amplitude\">\n";
         myfile << "        <DataArray type=\"Float32\" Name=\"Amplitude\" format=\"ascii\">\n";
-        for (int j = 0; j < d.Nx; j++){
-            for (int i = 0; i < d.Nz; i++){
+        for (int j = STENCIL; j < d.Nx - STENCIL; j++){
+            for (int i = STENCIL; i < d.Nz - STENCIL; i++){
                 myfile << u->get(i, j) << " ";
             }
         }
