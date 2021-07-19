@@ -59,6 +59,22 @@ void leParametros(Dominio* d){
 
 }
 
+float vel(Dominio d, int i, int j){
+
+    float c; // velocidade da onda na distancia i*dx e profundidade j*dz
+
+    if (j < 0.2*d.Nz ){
+        c = 2200;
+    } else if (j < 0.5*d.Nz){
+        c = 3000;
+    } else {
+        c = 4000;
+    }
+
+    return c;
+
+}
+
 float fonte(int x, int z, float k, Dominio d){
 
     // *funcao que simula um pulso sismico na posicao (xs, zs)
@@ -78,14 +94,18 @@ void mdf(Dominio d, Matriz2d* u_current, Matriz2d* u_next, int k){
 
     // * Função que calcula o u_next pelo u_current
 
-    float val;
+    float val, courantNumber, const1, const2;
 
     for (int i = STENCIL; i <= d.Nx - STENCIL; i++){
         
         for (int j = STENCIL; j <= d.Nz - STENCIL; j++){
 
+            courantNumber = d.dt*vel(d, i, j)/d.dx;
+            const1 = (pow(courantNumber, 2)/12.0);
+            const2 = pow(vel(d, i, j)*d.dt, 2);
+
             val = 
-            d.c1 *
+            const1 *
             (
                 -1*(u_current->get(i - 2, j) + u_current->get(i, j - 2)) + 
                 16*(u_current->get(i - 1, j) + u_current->get(i, j - 1)) - 
@@ -93,7 +113,7 @@ void mdf(Dominio d, Matriz2d* u_current, Matriz2d* u_next, int k){
                 16*(u_current->get(i + 1, j) + u_current->get(i, j + 1)) -
                    (u_current->get(i + 2, j) + u_current->get(i, j + 2)) 
             ) 
-            + 2*u_current->get(i, j) - u_next->get(i, j) - d.c2 * fonte(i, j, k, d);
+            + 2*u_current->get(i, j) - u_next->get(i, j) - const2 * fonte(i, j, k, d);
 
             u_next->set(i,j, val);
             
@@ -106,6 +126,8 @@ void Reynolds(Dominio d, Matriz2d* u_current, Matriz2d* u_next){
 
     // * Função que aplica a condição de contorno não-reflexiva de 
 
+    float courantNumber;
+
     // * borda esquerda
     //   du/dt - vel*du/dx = 0
     // (u(x,t+dt) - u(x,t))/dt = vel*(u(x+dx,t) - u(x,t))/dx
@@ -113,7 +135,8 @@ void Reynolds(Dominio d, Matriz2d* u_current, Matriz2d* u_next){
     // u(x, t+dt) = u(x,t) + cou * (u(x+dx,t) - u(x,t) )
     //    onde cou = dt*vel/dx
     for(int j = 0; j < d.Nz; j++) {
-        u_next->set(STENCIL, j, u_current->get(STENCIL,j) + d.cou*(u_current->get(STENCIL+1,j) - u_current->get(STENCIL,j)));
+        courantNumber = d.dt*vel(d, STENCIL, j)/d.dx;
+        u_next->set(STENCIL, j, u_current->get(STENCIL,j) + courantNumber*(u_current->get(STENCIL+1,j) - u_current->get(STENCIL,j)));
     }
 
     // * borda direita
@@ -121,21 +144,24 @@ void Reynolds(Dominio d, Matriz2d* u_current, Matriz2d* u_next){
     // u(x, t+dt) = u(x,t) - cou * (u(x,t) - u(x-dt,t) )
     // Aqui usamos diferencas atrasadas para discretizar do espaco
     for(int j = 0; j < d.Nz; j++) {
-        u_next->set(d.Nx-STENCIL, j, u_current->get(d.Nx-STENCIL,j) - d.cou*(u_current->get(d.Nx-STENCIL,j) - u_current->get(d.Nx-STENCIL-1,j)));
+        courantNumber = d.dt*vel(d, d.Nx-STENCIL, j)/d.dx;
+        u_next->set(d.Nx-STENCIL, j, u_current->get(d.Nx-STENCIL,j) - courantNumber*(u_current->get(d.Nx-STENCIL,j) - u_current->get(d.Nx-STENCIL-1,j)));
     }
 
     // * borda superior
     //   du/dt - vel*du/dz = 0
     // u(z, t+dt) = u(z,t) + cou * (u(z+dz,t) - u(z,t) )
     for (int i = 0; i < d.Nx; i++) {
-        u_next->set(i, STENCIL, u_current->get(i,STENCIL) + d.cou*(u_current->get(i,STENCIL+1) - u_current->get(i,STENCIL)));
+        courantNumber = d.dt*vel(d, i, STENCIL)/d.dx;
+        u_next->set(i, STENCIL, u_current->get(i,STENCIL) + courantNumber*(u_current->get(i,STENCIL+1) - u_current->get(i,STENCIL)));
     }
 
     // * borda inferior
     //   du/dt + vel*du/dz = 0
     // u(z, t+dt) = u(z,t) - cou * (u(z,t) - u(z-dz,t) )
     for (int i = 0; i < d.Nx; i++) {
-        u_next->set(i, d.Nz - STENCIL, u_current->get(i,d.Nz-STENCIL) - d.cou*(u_current->get(i,d.Nz-STENCIL) - u_current->get(i,d.Nz-STENCIL - 1)));
+        courantNumber = d.dt*vel(d, i, d.Nz - STENCIL)/d.dx;
+        u_next->set(i, d.Nz - STENCIL, u_current->get(i,d.Nz-STENCIL) - courantNumber*(u_current->get(i,d.Nz-STENCIL) - u_current->get(i,d.Nz-STENCIL - 1)));
     }
 
 }
@@ -266,7 +292,6 @@ int main() {
     cout << "Nx = " << d.Nx << endl;
     cout << "Nz = " << d.Nz << endl;
     cout << "Nt = " << d.Nt << endl;
-    cout << "Numero de Courant = " << d.cou << endl;
 
     auto inicio = chrono::high_resolution_clock::now();
 
