@@ -61,11 +61,17 @@ void leParametros(Dominio* d){
 
 float vel(Dominio d, int i, int j){
 
+    return dobra(d, i, j);
+
+}
+
+float planos_paralelos(Dominio d, int i, int j){
+     
     float c; // velocidade da onda na distancia i*dx e profundidade j*dz
 
-    if (j < 0.2*d.Nz ){
-        c = 2200;
-    } else if (j < 0.5*d.Nz){
+    if (j < d.Nz/3){
+        c = 1500;
+    } else if (j < 2*d.Nz/3){
         c = 3000;
     } else {
         c = 4000;
@@ -73,6 +79,45 @@ float vel(Dominio d, int i, int j){
 
     return c;
 
+}
+
+float circulo(Dominio d, int i, int j){
+
+    float c; // velocidade da onda na distancia i*dx e profundidade j*dz
+    float raio = d.Nx/2;
+    float circulo = -sqrt(pow(raio, 2) - pow(i - raio, 2)) + d.Nz;
+
+    if (j < d.Nz/3){
+        c = 1500;
+    } else if (j < circulo && j >= d.Nz/3){
+        c = 2000;
+    } else {
+        c = 3000;
+    }
+
+    return c;
+
+}
+
+float dobra(Dominio d, int i, int j){
+
+    float c; // velocidade da onda na distancia i*dx e profundidade j*dz
+    float raio = d.Nx/2;
+    float area;
+
+    if (i < raio){
+        area = sqrt(pow(raio, 2) - pow(i, 2)) + d.Nz/2;
+    } else {
+        area = -sqrt(pow(raio, 2) - pow(i - d.Nx, 2)) + d.Nz/2;
+    }
+
+    if (j < area){
+        c = 2500;
+    } else {
+        c = 3500;
+    }
+
+    return c;
 }
 
 float fonte(int x, int z, float k, Dominio d){
