@@ -59,12 +59,6 @@ void leParametros(Dominio* d){
 
 }
 
-float vel(Dominio d, int i, int j){
-
-    return dobra(d, i, j);
-
-}
-
 float planos_paralelos(Dominio d, int i, int j){
      
     float c; // velocidade da onda na distancia i*dx e profundidade j*dz
@@ -118,6 +112,34 @@ float dobra(Dominio d, int i, int j){
     }
 
     return c;
+}
+
+float reservatorio(Dominio d, int i, int j){
+
+    float c;
+    int me = 70;
+    float y = (8*pow(me, 3))/(pow(i, 2) + 4*pow(me,2)); // regiao do reservatorio
+
+    if (j <= y)
+        c = 1500;
+    else if (j > y and j < me)
+        c = 2000;
+    else if (j >= me and j < y + 50 and j < 147)
+        c = 2500;
+    else if (j >= 147 and j < y + 50)
+        c = 3000;
+    else if (j >= y + 50 and j < 230)
+        c = 3500;
+    else
+        c = 4000;
+
+    return c;
+}
+
+float vel(Dominio d, int i, int j){
+
+    return reservatorio(d, i, j);
+
 }
 
 float fonte(int x, int z, float k, Dominio d){
@@ -215,7 +237,7 @@ float atenuacao(float x, int borda){
 
     // * Função aplicada nas bordas para reduzir a amplitude da onda
 
-    float fat = 0.0035;
+    float fat = 0.004;
     return exp(-(pow(fat*(borda - x), 2)));
 
 }
