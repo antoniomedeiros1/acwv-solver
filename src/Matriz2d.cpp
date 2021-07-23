@@ -12,7 +12,6 @@ Matriz2d::Matriz2d(int nl, int nc){
 
     std::memset(mat,0.0,size*sizeof(float));
 
-
 }
 
 Matriz2d::~Matriz2d(){

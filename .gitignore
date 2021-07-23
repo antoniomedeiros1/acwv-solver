@@ -2,6 +2,7 @@
 *.dat
 *.gif
 *.vti
+*.bin
 
 # diretorios
 .vscode

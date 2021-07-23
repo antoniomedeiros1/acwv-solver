@@ -138,7 +138,7 @@ float reservatorio(Dominio d, int i, int j){
 
 float vel(Dominio d, int i, int j){
 
-    return reservatorio(d, i, j);
+    return planos_paralelos(d, i, j); //reservatorio(d, i, j);
 
 }
 
@@ -163,9 +163,9 @@ void mdf(Dominio d, Matriz2d* u_current, Matriz2d* u_next, int k){
 
     float val, courantNumber, const1, const2;
 
-    for (int i = STENCIL; i <= d.Nx - STENCIL; i++){
+    for (int j = STENCIL; j <= d.Nz - STENCIL; j++){
         
-        for (int j = STENCIL; j <= d.Nz - STENCIL; j++){
+        for (int i = STENCIL; i <= d.Nx - STENCIL; i++){
 
             courantNumber = d.dt*vel(d, i, j)/d.dx;
             const1 = (pow(courantNumber, 2)/12.0);
@@ -174,15 +174,15 @@ void mdf(Dominio d, Matriz2d* u_current, Matriz2d* u_next, int k){
             val = 
             const1 *
             (
-                -1*(u_current->get(i - 2, j) + u_current->get(i, j - 2)) + 
-                16*(u_current->get(i - 1, j) + u_current->get(i, j - 1)) - 
-                60* u_current->get(i,     j) +
-                16*(u_current->get(i + 1, j) + u_current->get(i, j + 1)) -
-                   (u_current->get(i + 2, j) + u_current->get(i, j + 2)) 
+                -1*(u_current->get(j, i - 2) + u_current->get(j - 2, i)) + 
+                16*(u_current->get(j, i - 1) + u_current->get(j - 1, i)) - 
+                60* u_current->get(j,     i) +
+                16*(u_current->get(j, i + 1) + u_current->get(j + 1, i)) -
+                   (u_current->get(j, i + 2) + u_current->get(j + 2, i)) 
             ) 
-            + 2*u_current->get(i, j) - u_next->get(i, j) - const2 * fonte(i, j, k, d);
+            + 2*u_current->get(j, i) - u_next->get(j, i) - const2 * fonte(i, j, k, d);
 
-            u_next->set(i,j, val);
+            u_next->set(j, i, val);
             
         }
     }
@@ -203,7 +203,7 @@ void Reynolds(Dominio d, Matriz2d* u_current, Matriz2d* u_next){
     //    onde cou = dt*vel/dx
     for(int j = 0; j < d.Nz; j++) {
         courantNumber = d.dt*vel(d, STENCIL, j)/d.dx;
-        u_next->set(STENCIL, j, u_current->get(STENCIL,j) + courantNumber*(u_current->get(STENCIL+1,j) - u_current->get(STENCIL,j)));
+        u_next->set(j, STENCIL, u_current->get(j, STENCIL) + courantNumber*(u_current->get(j,STENCIL+1) - u_current->get(j, STENCIL)));
     }
 
     // * borda direita
@@ -212,7 +212,7 @@ void Reynolds(Dominio d, Matriz2d* u_current, Matriz2d* u_next){
     // Aqui usamos diferencas atrasadas para discretizar do espaco
     for(int j = 0; j < d.Nz; j++) {
         courantNumber = d.dt*vel(d, d.Nx-STENCIL, j)/d.dx;
-        u_next->set(d.Nx-STENCIL, j, u_current->get(d.Nx-STENCIL,j) - courantNumber*(u_current->get(d.Nx-STENCIL,j) - u_current->get(d.Nx-STENCIL-1,j)));
+        u_next->set(j, d.Nx-STENCIL, u_current->get(j, d.Nx-STENCIL) - courantNumber*(u_current->get(j, d.Nx-STENCIL) - u_current->get(j, d.Nx-STENCIL-1)));
     }
 
     // * borda superior
@@ -220,7 +220,7 @@ void Reynolds(Dominio d, Matriz2d* u_current, Matriz2d* u_next){
     // u(z, t+dt) = u(z,t) + cou * (u(z+dz,t) - u(z,t) )
     for (int i = 0; i < d.Nx; i++) {
         courantNumber = d.dt*vel(d, i, STENCIL)/d.dx;
-        u_next->set(i, STENCIL, u_current->get(i,STENCIL) + courantNumber*(u_current->get(i,STENCIL+1) - u_current->get(i,STENCIL)));
+        u_next->set(STENCIL, i, u_current->get(STENCIL, i) + courantNumber*(u_current->get(STENCIL+1, i) - u_current->get(STENCIL, i)));
     }
 
     // * borda inferior
@@ -228,7 +228,7 @@ void Reynolds(Dominio d, Matriz2d* u_current, Matriz2d* u_next){
     // u(z, t+dt) = u(z,t) - cou * (u(z,t) - u(z-dz,t) )
     for (int i = 0; i < d.Nx; i++) {
         courantNumber = d.dt*vel(d, i, d.Nz - STENCIL)/d.dx;
-        u_next->set(i, d.Nz - STENCIL, u_current->get(i,d.Nz-STENCIL) - courantNumber*(u_current->get(i,d.Nz-STENCIL) - u_current->get(i,d.Nz-STENCIL - 1)));
+        u_next->set(d.Nz - STENCIL, i, u_current->get(d.Nz-STENCIL, i) - courantNumber*(u_current->get(d.Nz-STENCIL, i) - u_current->get(d.Nz-STENCIL - 1, i)));
     }
 
 }
@@ -237,7 +237,7 @@ float atenuacao(float x, int borda){
 
     // * Função aplicada nas bordas para reduzir a amplitude da onda
 
-    float fat = 0.004;
+    float fat = 0.0045;
     return exp(-(pow(fat*(borda - x), 2)));
 
 }
@@ -249,44 +249,45 @@ void camadasDeAbsorcao(Dominio d, Matriz2d* u_current, Matriz2d* u_next){
     int borda = 23;
 
     // percorre a faixa superior
-    for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
-        for(int j = STENCIL; j < borda; j++){
+    for(int j = STENCIL; j < borda; j++){
+        for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
 
-            u_current->set(i, j, u_current->get(i, j)*atenuacao(j, borda));
-            u_next->set(i,j, u_next->get(i, j)*atenuacao(j, borda));
+            u_current->set(j, i, u_current->get(j, i)*atenuacao(j, borda));
+            u_next->set(j, i, u_next->get(j, i)*atenuacao(j, borda));
+            
+        }
+    }
+
+    // percorre a faixa inferior
+    for(int j = d.Nz - borda; j <= d.Nz - STENCIL; j++){
+        for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
+
+            u_current->set(j, i, u_current->get(j, i)*atenuacao(d.Nz - j, borda));
+            u_next->set(j, i, u_next->get(j, i)*atenuacao(d.Nz - j, borda));
             
         }
     }
 
     // percorre a faixa esquerda
-    for(int i = STENCIL; i <= borda; i++){
-        for(int j = borda; j < d.Nz - borda; j++){
+    for(int j = borda; j < d.Nz - borda; j++){
+        for(int i = STENCIL; i <= borda; i++){
 
-            u_current->set(i,j, u_current->get(i, j)*atenuacao(i, borda));
-            u_next->set(i,j, u_next->get(i, j)*atenuacao(i, borda));
+            u_current->set(j,i, u_current->get(j, i)*atenuacao(i, borda));
+            u_next->set(j,i, u_next->get(j, i)*atenuacao(i, borda));
             
         }
     }
 
     // percorre a faixa direita
-    for(int i = d.Nx - borda; i <= d.Nx - STENCIL; i++){
-        for(int j = borda; j < d.Nz - borda; j++){
+    for(int j = borda; j < d.Nz - borda; j++){
+        for(int i = d.Nx - borda; i <= d.Nx - STENCIL; i++){
 
-            u_current->set(i,j, u_current->get(i, j)*atenuacao((d.Nx - i), borda));
-            u_next->set(i,j, u_next->get(i, j)*atenuacao((d.Nx - i), borda));
+            u_current->set(j,i, u_current->get(j, i)*atenuacao((d.Nx - i), borda));
+            u_next->set(j,i, u_next->get(j, i)*atenuacao((d.Nx - i), borda));
             
         }
     }
-    
-    // percorre a faixa inferior
-    for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
-        for(int j = d.Nz - borda; j <= d.Nz - STENCIL; j++){
 
-            u_current->set(i,j, u_current->get(i, j)*atenuacao(d.Nz - j, borda));
-            u_next->set(i,j, u_next->get(i, j)*atenuacao(d.Nz - j, borda));
-            
-        }
-    }
 
 }
 
@@ -327,9 +328,9 @@ void salvaVTI(Dominio d, int k, int modk, Matriz2d* u){
         myfile << "    <Piece Extent = \"" << STENCIL << " " << d.Nx - 1 - STENCIL << " " << STENCIL << " " << d.Nz - 1 - STENCIL << " " << 0 << " " << 0 << "\">\n";
         myfile << "      <PointData Scalars=\"Amplitude\">\n";
         myfile << "        <DataArray type=\"Float32\" Name=\"Amplitude\" format=\"ascii\">\n";
-        for (int j = STENCIL; j < d.Nx - STENCIL; j++){
-            for (int i = STENCIL; i < d.Nz - STENCIL; i++){
-                myfile << u->get(i, j) << " ";
+        for (int j = STENCIL; j < d.Nz - STENCIL; j++){
+            for (int i = STENCIL; i < d.Nx - STENCIL; i++){
+                myfile << u->get(j, i) << " ";
             }
         }
         myfile << "\n        </DataArray>";
@@ -351,8 +352,12 @@ int main() {
     leParametros(&d);
 
     // * é necessária a utilização de apenas duas matrizes para implementar o método de diferenças finitas
-    Matriz2d u_current(d.Nx, d.Nz);
-    Matriz2d u_next(d.Nx, d.Nz);
+    Matriz2d u_current(d.Nz, d.Nx);
+    Matriz2d u_next(d.Nz, d.Nx);
+
+    // * matriz para o sismograma com uma dimensão no espaço e uma no tempo
+    Matriz2d sis(d.Nt, d.Nx);
+    int posicao_receptor = 25; // profundidade em pontos dos receptores
     
     int modk = 50;
 
@@ -368,11 +373,20 @@ int main() {
         mdf(d, &u_current, &u_next, k);
         Reynolds(d, &u_current, &u_next);
         camadasDeAbsorcao(d, &u_current, &u_next);
+
+        // * armazena na matriz do sismograma
+        for (int i = 0; i < d.Nx; i++){
+            sis(k, i) = u_next(posicao_receptor, i);
+        }
         
         // * calcula u_current
         mdf(d, &u_next, &u_current, k + 1);
         // Reynolds(d, &u_next, &u_current);
         camadasDeAbsorcao(d, &u_next, &u_current);
+
+        for (int i = 0; i < d.Nx; i++){
+            sis(k + 1, i) = u_current(posicao_receptor, i);
+        }
 
         // * gera arquivo de dados a cada 100 iteracoes em k
         if (k % modk == 0){
@@ -380,6 +394,19 @@ int main() {
         }
 
     }
+
+    // * grava binario do sismograma
+    ofstream file;
+
+    file.open("../sis.bin", ios::out | ios::binary);
+
+    for (int i = 0; i < d.Nx; i++){
+        for (int k = 0; k < d.Nt; k++){
+            file.write((char *) &sis(k, i), sizeof(float));
+        }
+    }
+
+    file.close();
 
     cout << "\nArquivos gerados com sucesso!" << endl;
 
