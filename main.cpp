@@ -65,7 +65,7 @@ void leCamposDeVelocidades(Dominio* d){
 
     ifstream myfile;
 
-    myfile.open("../planos_paralelos.txt");
+    myfile.open("../reservatorio.txt");
 
     if(myfile.is_open()){
 
@@ -288,7 +288,7 @@ void salvaGNUPlot(Dominio d, int k, int modk, string base, Grid2d* u){
     myfile.close();
 }
 
-void salvaVTI(Dominio d, int k, int modk, Grid2d* u){
+void salvaVTI(Dominio d, Grid2d* u, string nomeDoArq, string info){
 
     // * Função que gera um arquivo vtk ImageData para o ParaView
 
@@ -296,7 +296,7 @@ void salvaVTI(Dominio d, int k, int modk, Grid2d* u){
 
     // cout << "Gerando arquivo data" << to_string(k/modk) << ".vti" << "..." << endl;
 
-    myfile.open("../data" + to_string(k/modk) + ".vti");
+    myfile.open("../" + nomeDoArq + ".vti");
 
     if(myfile.is_open()){
 
@@ -305,8 +305,8 @@ void salvaVTI(Dominio d, int k, int modk, Grid2d* u){
         myfile << "Origin = \"" << STENCIL << " " << d.Nz - 1 << " " << 0 << "\" ";
         myfile << "Spacing = \"" << d.dx << " " << d.dz << " " << 0 << "\">\n";
         myfile << "    <Piece Extent = \"" << STENCIL << " " << d.Nx - 1 - STENCIL << " " << STENCIL << " " << d.Nz - 1 - STENCIL << " " << 0 << " " << 0 << "\">\n";
-        myfile << "      <PointData Scalars=\"Amplitude\">\n";
-        myfile << "        <DataArray type=\"Float32\" Name=\"Amplitude\" format=\"ascii\">\n";
+        myfile << "      <PointData Scalars=\"" + info + "\">\n";
+        myfile << "        <DataArray type=\"Float32\" Name=\"" + info + "\" format=\"ascii\">\n";
         for (int j = STENCIL; j < d.Nz - STENCIL; j++){
             for (int i = STENCIL; i < d.Nx - STENCIL; i++){
                 myfile << u->get(j, i) << " ";
@@ -319,7 +319,7 @@ void salvaVTI(Dominio d, int k, int modk, Grid2d* u){
         myfile << "\n</VTKFile>";
 
     } else {
-        cout << "Erro na gravação do arquivo data" << to_string(k/modk) << ".vti" << endl;
+        cout << "Erro na gravação do arquivo " << nomeDoArq << ".vti" << endl;
     }
 
 }
@@ -329,6 +329,9 @@ int main() {
     // * inicializa os parametros da simulação
     Dominio d;
     leCamposDeVelocidades(&d);
+
+    // * salva a matriz de velocidades em vti
+    salvaVTI(d, d.vel, "modelo_vel", "velocidade");
 
     // * é necessária a utilização de apenas duas matrizes para implementar o método de diferenças finitas
     Grid2d u_current(d.Nz, d.Nx);
@@ -369,7 +372,8 @@ int main() {
 
         // * gera arquivo de dados a cada 100 iteracoes em k
         if (k % modk == 0){
-            salvaVTI(d, k, modk, &u_current);
+            string nomeDoArq = "data" + to_string(k/modk);
+            salvaVTI(d, &u_current, nomeDoArq, "Amplitude");
         }
 
     }
