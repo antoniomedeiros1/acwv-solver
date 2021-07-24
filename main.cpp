@@ -15,7 +15,7 @@ using namespace std;
 
 void leParametros(Dominio* d){
 
-    // * Função que lê os parâmetros da simulação
+    // * Função que lê os parâmetros da simulação (velocidade constante)
 
     ifstream myfile;
     myfile.open("../parametros.txt");
@@ -59,86 +59,53 @@ void leParametros(Dominio* d){
 
 }
 
-float planos_paralelos(Dominio d, int i, int j){
-     
-    float c; // velocidade da onda na distancia i*dx e profundidade j*dz
+void leCamposDeVelocidades(Dominio* d){
 
-    if (j < d.Nz/3){
-        c = 1500;
-    } else if (j < 2*d.Nz/3){
-        c = 3000;
+    // * Função que lê os parâmetros da simulação de um arquivo de velocidades
+
+    ifstream myfile;
+
+    myfile.open("../planos_paralelos.txt");
+
+    if(myfile.is_open()){
+
+        // dimensoes do dominio
+        myfile >> d->X;
+        myfile >> d->Z;
+        myfile >> d->T;
+
+        // largura da malha
+        myfile >> d->dx;
+        myfile >> d->dz;
+        myfile >> d->dt;
+
+        // posicao da fonte
+        myfile >> d->fcorte;
+        myfile >> d->xs;
+        myfile >> d->zs;
+
+        // numero de iteracoes
+        d->Nx = d->X/d->dx;
+        d->Nz = d->Z/d->dz;
+        d->Nt = d->T/d->dt;
+
+        d->vel = new Grid2d(d->Nz, d->Nx);
+        int v;
+
+        // matriz de velocidades
+        for (int j = 0; j < d->Nz; j++){
+            for (int i = 0; i < d->Nx; i++){
+                myfile >> v;
+                d->vel->set(j, i, v);
+            }
+        }
+
+        myfile.close();
+
     } else {
-        c = 4000;
+        cerr << "Falha ao abrir arquivo de parametros" << endl;
+        exit;
     }
-
-    return c;
-
-}
-
-float circulo(Dominio d, int i, int j){
-
-    float c; // velocidade da onda na distancia i*dx e profundidade j*dz
-    float raio = d.Nx/2;
-    float circulo = -sqrt(pow(raio, 2) - pow(i - raio, 2)) + d.Nz;
-
-    if (j < d.Nz/3){
-        c = 1500;
-    } else if (j < circulo && j >= d.Nz/3){
-        c = 2000;
-    } else {
-        c = 3000;
-    }
-
-    return c;
-
-}
-
-float dobra(Dominio d, int i, int j){
-
-    float c; // velocidade da onda na distancia i*dx e profundidade j*dz
-    float raio = d.Nx/2;
-    float area;
-
-    if (i < raio){
-        area = sqrt(pow(raio, 2) - pow(i, 2)) + d.Nz/2;
-    } else {
-        area = -sqrt(pow(raio, 2) - pow(i - d.Nx, 2)) + d.Nz/2;
-    }
-
-    if (j < area){
-        c = 2500;
-    } else {
-        c = 3500;
-    }
-
-    return c;
-}
-
-float reservatorio(Dominio d, int i, int j){
-
-    float c;
-    int me = 70;
-    float y = (8*pow(me, 3))/(pow(i, 2) + 4*pow(me,2)); // regiao do reservatorio
-
-    if (j <= y)
-        c = 1500;
-    else if (j > y and j < me)
-        c = 2000;
-    else if (j >= me and j < y + 50 and j < 147)
-        c = 2500;
-    else if (j >= 147 and j < y + 50)
-        c = 3000;
-    else if (j >= y + 50 and j < 230)
-        c = 3500;
-    else
-        c = 4000;
-
-    return c;
-}
-
-float vel(Dominio d, int i, int j){
-
-    return reservatorio(d, i, j); //reservatorio(d, i, j);
 
 }
 
@@ -167,9 +134,9 @@ void mdf(Dominio d, Grid2d* u_current, Grid2d* u_next, int k){
         
         for (int i = STENCIL; i <= d.Nx - STENCIL; i++){
 
-            courantNumber = d.dt*vel(d, i, j)/d.dx;
+            courantNumber = d.dt*d.vel->get(j, i)/d.dx;
             const1 = (pow(courantNumber, 2)/12.0);
-            const2 = pow(vel(d, i, j)*d.dt, 2);
+            const2 = pow(d.vel->get(j, i)*d.dt, 2);
 
             val = 
             const1 *
@@ -202,8 +169,11 @@ void Reynolds(Dominio d, Grid2d* u_current, Grid2d* u_next){
     // u(x, t+dt) = u(x,t) + cou * (u(x+dx,t) - u(x,t) )
     //    onde cou = dt*vel/dx
     for(int j = 0; j < d.Nz; j++) {
-        courantNumber = d.dt*vel(d, STENCIL, j)/d.dx;
+
+        courantNumber = d.dt * d.vel->get(j, STENCIL)/d.dx;
+
         u_next->set(j, STENCIL, u_current->get(j, STENCIL) + courantNumber*(u_current->get(j,STENCIL+1) - u_current->get(j, STENCIL)));
+    
     }
 
     // * borda direita
@@ -211,24 +181,33 @@ void Reynolds(Dominio d, Grid2d* u_current, Grid2d* u_next){
     // u(x, t+dt) = u(x,t) - cou * (u(x,t) - u(x-dt,t) )
     // Aqui usamos diferencas atrasadas para discretizar do espaco
     for(int j = 0; j < d.Nz; j++) {
-        courantNumber = d.dt*vel(d, d.Nx-STENCIL, j)/d.dx;
+
+        courantNumber = d.dt * d.vel->get(j, d.Nx - STENCIL)/d.dx;
+
         u_next->set(j, d.Nx-STENCIL, u_current->get(j, d.Nx-STENCIL) - courantNumber*(u_current->get(j, d.Nx-STENCIL) - u_current->get(j, d.Nx-STENCIL-1)));
+    
     }
 
     // * borda superior
     //   du/dt - vel*du/dz = 0
     // u(z, t+dt) = u(z,t) + cou * (u(z+dz,t) - u(z,t) )
     for (int i = 0; i < d.Nx; i++) {
-        courantNumber = d.dt*vel(d, i, STENCIL)/d.dx;
+
+        courantNumber = d.dt * d.vel->get(STENCIL, i)/d.dx;
+
         u_next->set(STENCIL, i, u_current->get(STENCIL, i) + courantNumber*(u_current->get(STENCIL+1, i) - u_current->get(STENCIL, i)));
+    
     }
 
     // * borda inferior
     //   du/dt + vel*du/dz = 0
     // u(z, t+dt) = u(z,t) - cou * (u(z,t) - u(z-dz,t) )
     for (int i = 0; i < d.Nx; i++) {
-        courantNumber = d.dt*vel(d, i, d.Nz - STENCIL)/d.dx;
+
+        courantNumber = d.dt * d.vel->get(d.Nz - STENCIL, i)/d.dx;
+
         u_next->set(d.Nz - STENCIL, i, u_current->get(d.Nz-STENCIL, i) - courantNumber*(u_current->get(d.Nz-STENCIL, i) - u_current->get(d.Nz-STENCIL - 1, i)));
+    
     }
 
 }
@@ -237,7 +216,7 @@ float atenuacao(float x, int borda){
 
     // * Função aplicada nas bordas para reduzir a amplitude da onda
 
-    float fat = 0.0045;
+    float fat = 0.0035;
     return exp(-(pow(fat*(borda - x), 2)));
 
 }
@@ -349,7 +328,7 @@ int main() {
 
     // * inicializa os parametros da simulação
     Dominio d;
-    leParametros(&d);
+    leCamposDeVelocidades(&d);
 
     // * é necessária a utilização de apenas duas matrizes para implementar o método de diferenças finitas
     Grid2d u_current(d.Nz, d.Nx);
@@ -357,7 +336,7 @@ int main() {
 
     // * matriz para o sismograma com uma dimensão no espaço e uma no tempo
     Grid2d sis(d.Nt, d.Nx);
-    int posicao_receptor = 50; // profundidade em pontos dos receptores
+    int posicao_receptor = 30; // profundidade em pontos dos receptores
     
     int modk = 50;
 
@@ -381,7 +360,7 @@ int main() {
         
         // * calcula u_current
         mdf(d, &u_next, &u_current, k + 1);
-        // Reynolds(d, &u_next, &u_current);
+        Reynolds(d, &u_next, &u_current);
         camadasDeAbsorcao(d, &u_next, &u_current);
 
         for (int i = 0; i < d.Nx; i++){

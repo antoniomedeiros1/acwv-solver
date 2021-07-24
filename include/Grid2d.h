@@ -9,6 +9,7 @@ class Grid2d{
 
     public:
 
+        Grid2d(){}
         Grid2d(int n_linhas, int n_colunas);
         ~Grid2d();
         float get(int j, int i);
