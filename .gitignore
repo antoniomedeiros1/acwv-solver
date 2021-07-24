@@ -8,3 +8,5 @@
 .vscode
 build
 config
+
+.ipynb_checkpoints
