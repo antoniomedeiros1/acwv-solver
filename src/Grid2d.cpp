@@ -2,9 +2,9 @@
 #include <cstring>
 using namespace std;
 
-#include "Matriz2d.h"
+#include "Grid2d.h"
 
-Matriz2d::Matriz2d(int nl, int nc){
+Grid2d::Grid2d(int nl, int nc){
     this->n_linhas = nl;
     this->n_cols   = nc;
     int size       = this->n_linhas*this->n_cols;
@@ -14,28 +14,28 @@ Matriz2d::Matriz2d(int nl, int nc){
 
 }
 
-Matriz2d::~Matriz2d(){
+Grid2d::~Grid2d(){
     delete [] mat;
 }
 
 
 // Modifiquei o acesso ao vetor para melhorar e eficiencia.
-float Matriz2d::get(int i, int j)
+float Grid2d::get(int j, int i)
 {
-    return mat[i*this->n_cols + j];
+    return mat[j*this->n_cols + i];
 }
 
-void Matriz2d::set(int i, int j, float val){
-    mat[i*this->n_cols + j] = val;
+void Grid2d::set(int j, int i, float val){
+    mat[j*this->n_cols + i] = val;
 }
 
-float& Matriz2d::operator()(int i, int j)
+float& Grid2d::operator()(int j, int i)
 {
-    return  mat[i*this->n_cols + j];
+    return  mat[j*this->n_cols + i];
 }
 
 
-void Matriz2d::swap(Matriz2d &orig)
+void Grid2d::swap(Grid2d &orig)
 {
     int size = this->n_cols*this->n_linhas;
     for(int i = 0; i < size; i++)

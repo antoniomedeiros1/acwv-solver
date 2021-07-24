@@ -8,7 +8,7 @@
 #include <string>
 #include <chrono>
 
-#include "Matriz2d.h"
+#include "Grid2d.h"
 #include "Dominio.h"
 
 using namespace std;
@@ -138,7 +138,7 @@ float reservatorio(Dominio d, int i, int j){
 
 float vel(Dominio d, int i, int j){
 
-    return planos_paralelos(d, i, j); //reservatorio(d, i, j);
+    return reservatorio(d, i, j); //reservatorio(d, i, j);
 
 }
 
@@ -157,7 +157,7 @@ float fonte(int x, int z, float k, Dominio d){
 
 }
 
-void mdf(Dominio d, Matriz2d* u_current, Matriz2d* u_next, int k){
+void mdf(Dominio d, Grid2d* u_current, Grid2d* u_next, int k){
 
     // * Função que calcula o u_next pelo u_current
 
@@ -189,7 +189,7 @@ void mdf(Dominio d, Matriz2d* u_current, Matriz2d* u_next, int k){
 
 }
 
-void Reynolds(Dominio d, Matriz2d* u_current, Matriz2d* u_next){
+void Reynolds(Dominio d, Grid2d* u_current, Grid2d* u_next){
 
     // * Função que aplica a condição de contorno não-reflexiva de 
 
@@ -242,7 +242,7 @@ float atenuacao(float x, int borda){
 
 }
 
-void camadasDeAbsorcao(Dominio d, Matriz2d* u_current, Matriz2d* u_next){
+void camadasDeAbsorcao(Dominio d, Grid2d* u_current, Grid2d* u_next){
 
     // * Percorre as bordas de das matrizes atual e proxima aplicando uma função de atenuação
 
@@ -291,7 +291,7 @@ void camadasDeAbsorcao(Dominio d, Matriz2d* u_current, Matriz2d* u_next){
 
 }
 
-void salvaGNUPlot(Dominio d, int k, int modk, string base, Matriz2d* u){
+void salvaGNUPlot(Dominio d, int k, int modk, string base, Grid2d* u){
 
     // * Função que gera um arquivo de dados no formato aceito pelo GNUPlot
 
@@ -302,14 +302,14 @@ void salvaGNUPlot(Dominio d, int k, int modk, string base, Matriz2d* u){
     myfile.open("../data" + to_string(k/modk) + base);
         for (int j = STENCIL; j < d.Nz - STENCIL; j++){
             for (int i = STENCIL; i < d.Nx - STENCIL; i++){
-                myfile << i*d.dz << " " << j*d.dx << " " << u->get(i, j) << "\n";
+                myfile << j*d.dz << " " << i*d.dx << " " << u->get(j, i) << "\n";
             }
             myfile << "\n\n";
         }
     myfile.close();
 }
 
-void salvaVTI(Dominio d, int k, int modk, Matriz2d* u){
+void salvaVTI(Dominio d, int k, int modk, Grid2d* u){
 
     // * Função que gera um arquivo vtk ImageData para o ParaView
 
@@ -352,12 +352,12 @@ int main() {
     leParametros(&d);
 
     // * é necessária a utilização de apenas duas matrizes para implementar o método de diferenças finitas
-    Matriz2d u_current(d.Nz, d.Nx);
-    Matriz2d u_next(d.Nz, d.Nx);
+    Grid2d u_current(d.Nz, d.Nx);
+    Grid2d u_next(d.Nz, d.Nx);
 
     // * matriz para o sismograma com uma dimensão no espaço e uma no tempo
-    Matriz2d sis(d.Nt, d.Nx);
-    int posicao_receptor = 25; // profundidade em pontos dos receptores
+    Grid2d sis(d.Nt, d.Nx);
+    int posicao_receptor = 50; // profundidade em pontos dos receptores
     
     int modk = 50;
 
