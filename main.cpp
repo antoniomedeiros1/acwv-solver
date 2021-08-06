@@ -13,6 +13,7 @@
 
 using namespace std;
 
+
 void leParametros(Dominio* d){
 
     // * Função que lê os parâmetros da simulação (velocidade constante)
@@ -59,13 +60,13 @@ void leParametros(Dominio* d){
 
 }
 
-void leCamposDeVelocidades(Dominio* d){
+void leCamposDeVelocidades(string nome, Dominio* d){
 
     // * Função que lê os parâmetros da simulação de um arquivo de velocidades
 
     ifstream myfile;
 
-    myfile.open("../reservatorio.txt");
+    myfile.open("../" + nome);
 
     if(myfile.is_open()){
 
@@ -328,7 +329,7 @@ int main() {
 
     // * inicializa os parametros da simulação
     Dominio d;
-    leCamposDeVelocidades(&d);
+    leCamposDeVelocidades("planos_paralelos.txt", &d);
 
     // * salva a matriz de velocidades em vti
     salvaVTI(d, d.vel, "modelo_vel", "velocidade");
@@ -339,7 +340,7 @@ int main() {
 
     // * matriz para o sismograma com uma dimensão no espaço e uma no tempo
     Grid2d sis(d.Nt, d.Nx);
-    int posicao_receptor = 30; // profundidade em pontos dos receptores
+    int posicao_receptor = 35; // profundidade em pontos dos receptores
     
     int modk = 50;
 
