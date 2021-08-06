@@ -1,5 +1,3 @@
-#include <math.h>
-
 struct Dominio {
 
     float X;       // *Largura do dominio em m
