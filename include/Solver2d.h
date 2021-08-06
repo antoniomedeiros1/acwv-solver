@@ -6,7 +6,6 @@
 #include <chrono>
 
 #include "Dominio.h"
-#include "Grid2d.h"
 
 #define STENCIL 3
 

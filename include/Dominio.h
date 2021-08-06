@@ -1,3 +1,4 @@
+#include "Grid2d.h"
 struct Dominio {
 
     float X;       // *Largura do dominio em m
