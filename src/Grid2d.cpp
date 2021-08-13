@@ -18,8 +18,6 @@ Grid2d::~Grid2d(){
     delete [] mat;
 }
 
-
-// Modifiquei o acesso ao vetor para melhorar e eficiencia.
 float Grid2d::get(int j, int i)
 {
     return mat[j*this->n_cols + i];
@@ -33,7 +31,6 @@ float& Grid2d::operator()(int j, int i)
 {
     return  mat[j*this->n_cols + i];
 }
-
 
 void Grid2d::swap(Grid2d &orig)
 {

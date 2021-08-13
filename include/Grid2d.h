@@ -1,9 +1,3 @@
-// Use algumas extensao do vscode para ajudar na documentação de suas classes.
-// Por exemplo: doxygen generator
-
-// Pensou em usar classes templates?
-// TODO: usar templates para utilizar diferentes tipos de dados 
-
 
 class Grid2d{
 
