@@ -19,13 +19,21 @@ Grid3d::~Grid3d() {
 }
 
 float Grid3d::get(int k, int j, int i) {
-    return mat[k * this->n_profundidade + j * this->n_cols + i];
+    return mat[k * this->n_cols * this->n_linhas + j * this->n_cols + i];
 }
 
 void Grid3d::set(int k, int j, int i, float val) {
-    mat[k * this->n_profundidade + j * this->n_cols + i] = val;
+    mat[k * this->n_cols * this->n_linhas + j * this->n_cols + i] = val;
+}
+
+int Grid3d::getSize(){
+    return this->size;
+}
+
+float* Grid3d::firstptr(){
+    return this->mat;
 }
 
 float& Grid3d::operator()(int k, int j, int i) {
-    return  mat[k * this->n_profundidade + j * this->n_cols + i];
+    return  mat[k * this->n_cols * this->n_linhas + j * this->n_cols + i];
 }

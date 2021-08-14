@@ -12,6 +12,8 @@ class Grid3d{
         ~Grid3d();
         float get(int k, int j, int i);
         void set(int k, int j, int i, float val);
+        int getSize();
+        float* firstptr();
         float& operator()(int k, int j, int i); // utilizando sobrecarga de operadores
 
     private:
