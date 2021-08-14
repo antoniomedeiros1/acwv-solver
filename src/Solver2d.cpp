@@ -324,7 +324,7 @@ void Solver2d::solve(){
     for (int k = 0; k <= d.Nt; k += 2){
 
         // * calcula u_next
-        this->mdf(d, u_current, u_next, k + 1);
+        this->mdf(d, u_current, u_next, k);
         this->aplicaReynolds();
         this->aplicaAmortecimento();
 

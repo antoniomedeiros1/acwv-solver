@@ -2,14 +2,15 @@
 #define STENCIL 3 
 
 #include <iostream>
-#include "Solver2d.h"
+
+#include "Solver3d.h"
 
 using namespace std;
 
 int main() {
 
-    Solver2d s("reservatorio.txt");
-    s.solve();
+    Solver3d solver;
+    solver.solve();
 
     return 0;
 }

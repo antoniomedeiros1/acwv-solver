@@ -20,7 +20,6 @@ class Solver2d{
         ~Solver2d();
         void imprimeParametros();
         void salvaVTI(Dominio d, Grid2d* u, string nomeDoArq, string info);
-
         void solve();
 
         // atributos
