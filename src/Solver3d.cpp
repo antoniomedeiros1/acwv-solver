@@ -233,7 +233,7 @@ void Solver3d::mdf3d(Grid3d* u1, Grid3d* u2){
                 16*(u1->get(k,j,i-1) + u1->get(k,j,i+1) + u1->get(k,j-1,i) + u1->get(k,j+1,i) + u1->get(k-1,j,i) + u1->get(k+1,j,i)) -
                 90*u1->get(k, j, i)
                 ) + 
-                2*u1->get(k, j, i) - u2->get(k, i, j);
+                2*u1->get(k, j, i) - u2->get(k, j, i);
 
                 u2->set(k, j, i, val);
 
@@ -245,14 +245,14 @@ void Solver3d::mdf3d(Grid3d* u1, Grid3d* u2){
 
 void Solver3d::solve(){
 
-    int modk = 200;
+    int modk = 100;
     int t; // iterador temporal
 
     auto inicio = chrono::high_resolution_clock::now();
 
     // laço temporal com fonte
     cout << "Iniciando laço temporal" << endl;
-    for (t = 0; t < 2000; t += 2){
+    for (t = 0; t < d.Nt; t += 2){
         
         // * calcula u_next
         this->mdf3d(u_current, u_next, t);
@@ -265,24 +265,6 @@ void Solver3d::solve(){
         
         // * calcula u_current
         this->mdf3d(u_next, u_current, t + 1);
-
-    }
-    cout << "Iniciando laço temporal sem pulso" << endl;
-
-    // laço temporal sem fonte
-    for (t = 2000; t <= d.T; t += 2){
-
-        // * calcula u_next
-        this->mdf3d(u_current, u_next);
-        
-        // * calcula u_current
-        this->mdf3d(u_next, u_current);
-
-        // * gera arquivo de dados a cada 100 iteracoes em k
-        if (t % modk == 0){
-            string nomeDoArq = "data" + to_string(t/modk);
-            this->salvaVTI(d, u_current, nomeDoArq, "Amplitude");
-        }
 
     }
 
