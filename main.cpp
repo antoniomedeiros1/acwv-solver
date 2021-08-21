@@ -2,6 +2,7 @@
 #define STENCIL 3 
 
 #include <iostream>
+#include "omp.h"
 
 #include "Solver3d.h"
 

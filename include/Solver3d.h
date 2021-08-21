@@ -27,6 +27,9 @@ class Solver3d {
         float pulso3d(int x, int y, int z, int t);
         void mdf3d(Grid3d* u1, Grid3d* u2, int t); // 
         void mdf3d(Grid3d* u1, Grid3d* u2);
+        void reynolds();
+        float atenuacao(float x, int borda);
+        void aplicaAmortecimento();
 
         // atributos
         Dominio d;          // * Parametros do modelo

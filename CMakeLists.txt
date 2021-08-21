@@ -1,8 +1,11 @@
 cmake_minimum_required(VERSION 3.10)
 project(mdf)
+find_package(OpenMP)
 
-## Essa flag deixa o codigo mais rapido
-set(CMAKE_CXX_FLAGS "-O3")
+if (OpenMP_FOUND)
+set(CMAKE_CXX_FLAGS "-fopenmp")
+endif()
+
 
 ## Voce pode usar o comando file para obter a lista de todos
 ## arquivos na raiz do projeto .cpp e de dentro do  diretorio src

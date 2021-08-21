@@ -192,9 +192,10 @@ void Solver3d::mdf3d(Grid3d* u1, Grid3d* u2, int t){
     float const1 = (pow(courantNumber, 2)/12.0);
     float const2 = pow(d.c*d.dt, 2);
 
-    for (int k = STENCIL; k < d.Nz - STENCIL; k++){
-        for (int j = STENCIL; j < d.Ny - STENCIL; j++){
-            for (int i = STENCIL; i < d.Nx - STENCIL; i++){
+    #pragma omp parallel for collapse(2) private(val)
+    for (int k = STENCIL; k <= d.Nz - STENCIL; k++){
+        for (int j = STENCIL; j <= d.Ny - STENCIL; j++){
+            for (int i = STENCIL; i <= d.Nx - STENCIL; i++){
 
                 val = 
                 const1 *
@@ -243,9 +244,128 @@ void Solver3d::mdf3d(Grid3d* u1, Grid3d* u2){
 
 }
 
+void Solver3d::reynolds(){
+
+    float courantNumber = d.dt * d.c/d.dx;
+
+    // plano x = 0 e x = Nx
+    for (int k = STENCIL; k <= d.Nz - STENCIL; k++){
+        for(int j = STENCIL; j <= d.Ny - STENCIL; j++){
+            u_next->set(k, j, STENCIL, u_current->get(k, j, STENCIL) + courantNumber*(u_current->get(k, j,STENCIL+1) - u_current->get(k, j, STENCIL)));
+            u_next->set(k, j, d.Nx-STENCIL, u_current->get(k, j, d.Nx-STENCIL) - courantNumber*(u_current->get(k, j, d.Nx-STENCIL) - u_current->get(k, j, d.Nx-STENCIL-1)));
+        }
+    }
+
+    // plano y = 0 e y = Ny
+    for (int k = STENCIL; k <= d.Nz - STENCIL; k++){
+        for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
+            u_next->set(k, STENCIL, i, u_current->get(k, STENCIL, i) + courantNumber*(u_current->get(k, STENCIL+1, i) - u_current->get(k, STENCIL, i)));
+            u_next->set(k, d.Ny-STENCIL, i, u_current->get(k, d.Ny-STENCIL, i) - courantNumber*(u_current->get(k, d.Ny-STENCIL, i) - u_current->get(k, d.Ny-STENCIL-1, i)));
+        }
+    }
+
+    // plano z = 0 e z = Nz
+    for (int j = STENCIL; j <= d.Ny - STENCIL; j++){
+        for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
+            u_next->set(STENCIL, j, i, u_current->get(STENCIL, j, i) + courantNumber*(u_current->get(STENCIL+1, j, i) - u_current->get(STENCIL, j, i)));
+            u_next->set(d.Nz-STENCIL, j, i, u_current->get(d.Nz-STENCIL, j, i) - courantNumber*(u_current->get(d.Nz-STENCIL, j, i) - u_current->get(d.Nz-STENCIL-1, j, i)));
+        }
+    }
+
+}
+
+float Solver3d::atenuacao(float x, int borda){
+
+    // * Função aplicada nas fronteiras para reduzir a amplitude da onda
+
+    float fat = 0.0035;
+    return exp(-(pow(fat*(borda - x), 2)));
+
+}
+
+void Solver3d::aplicaAmortecimento(){
+
+    // * Percorre os planos das matrizes atual e proxima aplicando uma função de atenuação
+
+    int borda = 20 + STENCIL;
+
+    // plano superior z = 0
+    for (int k = STENCIL; k <= borda; k++){
+        for(int j = STENCIL; j <= d.Ny - STENCIL; j++){
+            for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
+
+                u_current->set(k, j, i, u_current->get(k, j, i)*atenuacao(k, borda));
+                u_next->set(k, j, i, u_next->get(k, j, i)*atenuacao(k, borda));
+                
+            }
+        }
+    }
+
+    // plano inferior z = Nz
+    for (int k = d.Nz - borda; k <= d.Nz - STENCIL; k++){
+        for(int j = STENCIL; j <= d.Ny - STENCIL; j++){
+            for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
+
+                u_current->set(k, j, i, u_current->get(k, j, i)*atenuacao(d.Nz - k, borda));
+                u_next->set(k, j, i, u_next->get(k, j, i)*atenuacao(d.Nz - k, borda));
+                
+            }
+        }
+    }
+
+    // plano lateral y = 0
+    for (int k = STENCIL; k <= d.Nz - STENCIL; k++){
+        for(int j = STENCIL; j <= borda; j++){
+            for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
+
+                u_current->set(k, j, i, u_current->get(k, j, i)*atenuacao(j, borda));
+                u_next->set(k, j, i, u_next->get(k, j, i)*atenuacao(j, borda));
+                
+            }
+        }
+    }
+
+    // plano lateral y = Ny
+    for (int k = STENCIL; k <= d.Nz - STENCIL; k++){
+        for(int j = d.Ny - borda; j <= d.Ny - STENCIL; j++){
+            for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
+
+                u_current->set(k, j, i, u_current->get(k, j, i)*atenuacao(d.Ny - j, borda));
+                u_next->set(k, j, i, u_next->get(k, j, i)*atenuacao(d.Ny - j, borda));
+                
+            }
+        }
+    }
+
+    // plano lateral x = 0
+    for (int k = STENCIL; k <= d.Nz - STENCIL; k++){
+        for(int j = STENCIL; j <= d.Ny - STENCIL; j++){
+            for(int i = STENCIL; i <= borda; i++){
+
+                u_current->set(k, j, i, u_current->get(k, j, i)*atenuacao(i, borda));
+                u_next->set(k, j, i, u_next->get(k, j, i)*atenuacao(i, borda));
+                
+            }
+        }
+    }
+
+    // plano lateral x = Nx
+    for (int k = STENCIL; k <= d.Nz - STENCIL; k++){
+        for(int j = STENCIL; j < d.Ny - STENCIL; j++){
+            for(int i = d.Nx - borda; i <= d.Nx - STENCIL; i++){
+
+                u_current->set(k, j, i, u_current->get(k, j, i)*atenuacao(d.Nx - i, borda));
+                u_next->set(k, j, i, u_next->get(k, j, i)*atenuacao(d.Nx - i, borda));
+                
+            }
+        }
+    }
+
+}
+
 void Solver3d::solve(){
 
-    int modk = 100;
+    int modk = 50;
     int t; // iterador temporal
 
     auto inicio = chrono::high_resolution_clock::now();
@@ -256,15 +376,18 @@ void Solver3d::solve(){
         
         // * calcula u_next
         this->mdf3d(u_current, u_next, t);
+        reynolds();
+        aplicaAmortecimento();
 
         // * gera arquivo de dados a cada 100 iteracoes em k
         if (t % modk == 0){
-            string nomeDoArq = "data" + to_string(t/modk);
+            string nomeDoArq = "data" + to_string(t/modk + 1);
             this->salvaVTI(d, u_current, nomeDoArq, "Amplitude");
         }
         
         // * calcula u_current
         this->mdf3d(u_next, u_current, t + 1);
+        aplicaAmortecimento();
 
     }
 
