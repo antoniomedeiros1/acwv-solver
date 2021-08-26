@@ -130,41 +130,42 @@ void Solver3d::salvaVTI(Dominio d, Grid3d* u, string nomeDoArq, string info){
 
 }
 
-// void Solver3d::salvaVTIBinary(Dominio d, Grid3d* u, string nomeDoArq, string info){
+void Solver3d::salvaVTIBinary(Dominio d, Grid3d* u, string nomeDoArq, string info){
 
 
-//     // * Função que gera um arquivo vtk ImageData para o ParaView
+    // * Função que gera um arquivo vtk ImageData para o ParaView
 
-//     ofstream myfile;
+    ofstream myfile;
 
-//     myfile.open("../" + nomeDoArq + ".vti", ios::binary);
+    myfile.open("../" + nomeDoArq + ".vti", ios::binary);
 
-//     if(myfile.is_open()){
+    if(myfile.is_open()){
 
-//         myfile << "<VTKFile type=\"ImageData\" version=\"0.1\" byte_order=\"LittleEndian\">\n";
-//         myfile << "  <ImageData WholeExtent= \"" <<  STENCIL << " " << d.Nx - 1 - STENCIL << " " << STENCIL << " " << d.Ny - 1 - STENCIL << " " << STENCIL << " " << d.Nz - 1 - STENCIL << "\" ";
-//         myfile << "Origin = \"" << STENCIL << " " << STENCIL << " " << d.Nz - 1 - STENCIL << "\" ";
-//         myfile << "Spacing = \"" << d.dx << " " << d.dy << " " << d.dz << "\">\n";
-//         myfile << "    <Piece Extent = \"" << STENCIL << " " << d.Nx - 1 - STENCIL << " " << STENCIL << " " << d.Ny - 1 - STENCIL << " " << STENCIL << " " << d.Nz - 1 - STENCIL << "\">\n";
-//         myfile << "      <PointData Scalars=\"" + info + "\">\n";
-//         myfile << "        <DataArray type=\"Float32\" Name=\"" + info + "\" format=\"binary\">\n";
+        myfile << "<VTKFile type=\"ImageData\" version=\"0.1\" byte_order=\"LittleEndian\">\n";
+        myfile << "  <ImageData WholeExtent= \"" <<  STENCIL << " " << d.Nx - 1 - STENCIL << " " << STENCIL << " " << d.Ny - 1 - STENCIL << " " << STENCIL << " " << d.Nz - 1 - STENCIL << "\" ";
+        myfile << "Origin = \"" << STENCIL << " " << STENCIL << " " << d.Nz - 1 - STENCIL << "\" ";
+        myfile << "Spacing = \"" << d.dx << " " << d.dy << " " << d.dz << "\">\n";
+        myfile << "    <Piece Extent = \"" << STENCIL << " " << d.Nx - 1 - STENCIL << " " << STENCIL << " " << d.Ny - 1 - STENCIL << " " << STENCIL << " " << d.Nz - 1 - STENCIL << "\">\n";
+        myfile << "      <PointData Scalars=\"" + info + "\">\n";
+        myfile << "        <DataArray type=\"Float64\" Name=\"" + info + "\" format=\"binary\">\n";
 
-//         int result_size;
-//         char *encoding = base64((char *)u->firstptr(), sizeof(float) * u->getSize(), &result_size);
-//         myfile.write(encoding, result_size);
+        // int result_size;
+        // char *encoding = base64((char *)u->firstptr(), sizeof(float) * u->getSize(), &result_size);
+        // myfile.write(encoding, result_size);
+        myfile.write((char *) u->firstptr(), u->getSize() * sizeof(float));
 
-//         myfile << "\n        </DataArray>";
-//         myfile << "\n      </PointData>";
-//         myfile << "\n    </Piece>";
-//         myfile << "\n  </ImageData>";
-//         myfile << "\n</VTKFile>";
+        myfile << "\n        </DataArray>";
+        myfile << "\n      </PointData>";
+        myfile << "\n    </Piece>";
+        myfile << "\n  </ImageData>";
+        myfile << "\n</VTKFile>";
 
-//     } else {
-//         cout << "Erro na gravação do arquivo " << nomeDoArq << ".vti" << endl;
-//     }
+    } else {
+        cout << "Erro na gravação do arquivo " << nomeDoArq << ".vti" << endl;
+    }
 
 
-// }
+}
 
 
 float Solver3d::pulso3d(int x, int y, int z, int t){
@@ -249,6 +250,7 @@ void Solver3d::reynolds(){
     float courantNumber = d.dt * d.c/d.dx;
 
     // plano x = 0 e x = Nx
+    #pragma omp parallel for collapse(2)
     for (int k = STENCIL; k <= d.Nz - STENCIL; k++){
         for(int j = STENCIL; j <= d.Ny - STENCIL; j++){
             u_next->set(k, j, STENCIL, u_current->get(k, j, STENCIL) + courantNumber*(u_current->get(k, j,STENCIL+1) - u_current->get(k, j, STENCIL)));
@@ -257,6 +259,7 @@ void Solver3d::reynolds(){
     }
 
     // plano y = 0 e y = Ny
+    #pragma omp parallel for collapse(2)
     for (int k = STENCIL; k <= d.Nz - STENCIL; k++){
         for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
             u_next->set(k, STENCIL, i, u_current->get(k, STENCIL, i) + courantNumber*(u_current->get(k, STENCIL+1, i) - u_current->get(k, STENCIL, i)));
@@ -265,6 +268,7 @@ void Solver3d::reynolds(){
     }
 
     // plano z = 0 e z = Nz
+    #pragma omp parallel for collapse(2)
     for (int j = STENCIL; j <= d.Ny - STENCIL; j++){
         for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
             u_next->set(STENCIL, j, i, u_current->get(STENCIL, j, i) + courantNumber*(u_current->get(STENCIL+1, j, i) - u_current->get(STENCIL, j, i)));
@@ -290,6 +294,7 @@ void Solver3d::aplicaAmortecimento(){
     int borda = 20 + STENCIL;
 
     // plano superior z = 0
+    #pragma omp parallel for collapse(2)
     for (int k = STENCIL; k <= borda; k++){
         for(int j = STENCIL; j <= d.Ny - STENCIL; j++){
             for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
@@ -302,6 +307,7 @@ void Solver3d::aplicaAmortecimento(){
     }
 
     // plano inferior z = Nz
+    #pragma omp parallel for collapse(2)
     for (int k = d.Nz - borda; k <= d.Nz - STENCIL; k++){
         for(int j = STENCIL; j <= d.Ny - STENCIL; j++){
             for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
@@ -314,6 +320,7 @@ void Solver3d::aplicaAmortecimento(){
     }
 
     // plano lateral y = 0
+    #pragma omp parallel for collapse(2)
     for (int k = STENCIL; k <= d.Nz - STENCIL; k++){
         for(int j = STENCIL; j <= borda; j++){
             for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
@@ -326,6 +333,7 @@ void Solver3d::aplicaAmortecimento(){
     }
 
     // plano lateral y = Ny
+    #pragma omp parallel for collapse(2)
     for (int k = STENCIL; k <= d.Nz - STENCIL; k++){
         for(int j = d.Ny - borda; j <= d.Ny - STENCIL; j++){
             for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
@@ -338,6 +346,7 @@ void Solver3d::aplicaAmortecimento(){
     }
 
     // plano lateral x = 0
+    #pragma omp parallel for collapse(2)
     for (int k = STENCIL; k <= d.Nz - STENCIL; k++){
         for(int j = STENCIL; j <= d.Ny - STENCIL; j++){
             for(int i = STENCIL; i <= borda; i++){
@@ -350,6 +359,7 @@ void Solver3d::aplicaAmortecimento(){
     }
 
     // plano lateral x = Nx
+    #pragma omp parallel for collapse(2)
     for (int k = STENCIL; k <= d.Nz - STENCIL; k++){
         for(int j = STENCIL; j < d.Ny - STENCIL; j++){
             for(int i = d.Nx - borda; i <= d.Nx - STENCIL; i++){
