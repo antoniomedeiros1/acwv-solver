@@ -10,7 +10,7 @@ using namespace std;
 
 int main() {
 
-    Solver3d solver;
+    Solver2d solver("semicirculo.txt");
     solver.solve();
 
     return 0;

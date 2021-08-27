@@ -4,8 +4,9 @@
 #include "math.h"
 #include <string>
 #include <chrono>
-// #include "base64.h"
+
 #include "Solver2d.h"
+// #include "base64.h"
 
 #define STENCIL 3
 

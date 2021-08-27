@@ -141,24 +141,27 @@ void Solver3d::salvaVTIBinary(Dominio d, Grid3d* u, string nomeDoArq, string inf
 
     if(myfile.is_open()){
 
-        myfile << "<VTKFile type=\"ImageData\" version=\"0.1\" byte_order=\"LittleEndian\">\n";
+        myfile << "<VTKFile type=\"ImageData\" version=\"0.1\" byte_order=\"LittleEndian\">";
         myfile << "  <ImageData WholeExtent= \"" <<  STENCIL << " " << d.Nx - 1 - STENCIL << " " << STENCIL << " " << d.Ny - 1 - STENCIL << " " << STENCIL << " " << d.Nz - 1 - STENCIL << "\" ";
         myfile << "Origin = \"" << STENCIL << " " << STENCIL << " " << d.Nz - 1 - STENCIL << "\" ";
-        myfile << "Spacing = \"" << d.dx << " " << d.dy << " " << d.dz << "\">\n";
-        myfile << "    <Piece Extent = \"" << STENCIL << " " << d.Nx - 1 - STENCIL << " " << STENCIL << " " << d.Ny - 1 - STENCIL << " " << STENCIL << " " << d.Nz - 1 - STENCIL << "\">\n";
-        myfile << "      <PointData Scalars=\"" + info + "\">\n";
-        myfile << "        <DataArray type=\"Float64\" Name=\"" + info + "\" format=\"binary\">\n";
+        myfile << "Spacing = \"" << d.dx << " " << d.dy << " " << d.dz << "\">";
+        myfile << "    <Piece Extent = \"" << STENCIL << " " << d.Nx - 1 - STENCIL << " " << STENCIL << " " << d.Ny - 1 - STENCIL << " " << STENCIL << " " << d.Nz - 1 - STENCIL << "\">";
+        myfile << "      <PointData Scalars=\"" + info + "\">";
+        myfile << "        <DataArray type=\"Float32\" Name=\"" + info + "\" format=\"appended\">";
 
         // int result_size;
         // char *encoding = base64((char *)u->firstptr(), sizeof(float) * u->getSize(), &result_size);
         // myfile.write(encoding, result_size);
-        myfile.write((char *) u->firstptr(), u->getSize() * sizeof(float));
+        // myfile.write((char *) u->firstptr(), u->getSize() * sizeof(double));
 
-        myfile << "\n        </DataArray>";
-        myfile << "\n      </PointData>";
-        myfile << "\n    </Piece>";
-        myfile << "\n  </ImageData>";
-        myfile << "\n</VTKFile>";
+        myfile << "        </DataArray>";
+        myfile << "      </PointData>";
+        myfile << "    </Piece>";
+        myfile << "  </ImageData>";
+        myfile << "  <AppendedData> encoding=\"base64\"";
+        myfile.write((char *) u->firstptr(), u->getSize() * sizeof(double));
+        myfile << "  </AppendedData>";
+        myfile << "</VTKFile>";
 
     } else {
         cout << "Erro na gravação do arquivo " << nomeDoArq << ".vti" << endl;
@@ -381,7 +384,7 @@ void Solver3d::solve(){
     auto inicio = chrono::high_resolution_clock::now();
 
     // laço temporal com fonte
-    cout << "Iniciando laço temporal" << endl;
+    cout << "Iniciando laço temporal..." << endl;
     for (t = 0; t < d.Nt; t += 2){
         
         // * calcula u_next
@@ -391,8 +394,8 @@ void Solver3d::solve(){
 
         // * gera arquivo de dados a cada 100 iteracoes em k
         if (t % modk == 0){
-            string nomeDoArq = "data" + to_string(t/modk + 1);
-            this->salvaVTI(d, u_current, nomeDoArq, "Amplitude");
+            string nomeDoArq = "data" + to_string(t/modk);
+            this->salvaVTI(d, u_current, nomeDoArq, "P-Wave");
         }
         
         // * calcula u_current

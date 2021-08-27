@@ -10,6 +10,8 @@ class Grid2d{
         void set(int j, int i, float val);
         void swap(Grid2d &orig);
         float& operator()(int j, int i); // utilizando sobrecarga de operadores
+        float* firstptr(){ return mat; }
+        int getSize(){ return n_linhas * n_cols; };
 
     private:
         int n_linhas;

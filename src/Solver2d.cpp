@@ -11,7 +11,7 @@ Solver2d::Solver2d(string nomeDoArquivo){
     this->sis = new Grid2d(this->d.Nt, this->d.Nx);
 
     this->posReceptor = this->d.zs/this->d.dz;
-    this->modk = 50;
+    this->modk = 100;
 
 }
 
@@ -113,6 +113,40 @@ void Solver2d::salvaVTI(Dominio d, Grid2d* grid, string nomeDoArq, string info){
 
 }
 
+void Solver2d::salvaVTIbin(Dominio d, Grid2d* grid, string nomeDoArq, string info){
+
+    // * Função que gera um arquivo vtk ImageData para o ParaView
+
+    ofstream myfile;
+
+    // cout << "Gerando arquivo data" << to_string(k/modk) << ".vti" << "..." << endl;
+
+    myfile.open("../" + nomeDoArq + ".vti", ios::binary);
+
+    if(myfile.is_open()){
+
+        myfile << "<VTKFile type=\"ImageData\" version=\"0.1\" byte_order=\"LittleEndian\">\n";
+        myfile << "  <ImageData WholeExtent= \"" <<  STENCIL << " " << d.Nx - 1 - STENCIL << " " << STENCIL << " " << d.Nz - 1 - STENCIL << " " << 0 << " " << 0 << "\" ";
+        myfile << "Origin = \"" << STENCIL << " " << d.Nz - 1 << " " << 0 << "\" ";
+        myfile << "Spacing = \"" << d.dx << " " << d.dz << " " << 0 << "\">\n";
+        myfile << "    <Piece Extent = \"" << STENCIL << " " << d.Nx - 1 - STENCIL << " " << STENCIL << " " << d.Nz - 1 - STENCIL << " " << 0 << " " << 0 << "\">\n";
+        myfile << "      <PointData Scalars=\"" + info + "\">\n";
+        myfile << "        <DataArray type=\"Float32\" Name=\"" + info + "\" format=\"binary\">\n";
+
+        myfile.write((char *) grid->firstptr(), grid->getSize() * sizeof(float));
+
+        myfile << "\n        </DataArray>";
+        myfile << "\n      </PointData>";
+        myfile << "\n    </Piece>";
+        myfile << "\n  </ImageData>";
+        myfile << "\n</VTKFile>";
+
+    } else {
+        cout << "Erro na gravação do arquivo " << nomeDoArq << ".vti" << endl;
+    }
+
+}
+
 void salvaGNUPlot(Dominio d, int k, int modk, string base, Grid2d* u){
 
     // * Função que gera um arquivo de dados no formato aceito pelo GNUPlot
@@ -170,6 +204,7 @@ void Solver2d::mdf(Dominio d, Grid2d* u_current, Grid2d* u_next, int k){
 
     float val, courantNumber, const1, const2;
 
+    #pragma omp parallel for collapse(1) private(val, courantNumber, const1, const2)
     for (int j = STENCIL; j <= d.Nz - STENCIL; j++){
         
         for (int i = STENCIL; i <= d.Nx - STENCIL; i++){
@@ -208,6 +243,7 @@ void Solver2d::aplicaReynolds(){
     // (u(x,t+dt) - u(x,t)) =   dt*(vel*(u(x+dx,t) - u(x,t))/dx
     // u(x, t+dt) = u(x,t) + cou * (u(x+dx,t) - u(x,t) )
     //    onde cou = dt*vel/dx
+    #pragma omp parallel for private(courantNumber)
     for(int j = 0; j < d.Nz; j++) {
 
         courantNumber = d.dt * d.vel->get(j, STENCIL)/d.dx;
@@ -220,6 +256,7 @@ void Solver2d::aplicaReynolds(){
     //   du/dt + vel*du/dx = 0
     // u(x, t+dt) = u(x,t) - cou * (u(x,t) - u(x-dt,t) )
     // Aqui usamos diferencas atrasadas para discretizar do espaco
+    #pragma omp parallel for private(courantNumber)
     for(int j = 0; j < d.Nz; j++) {
 
         courantNumber = d.dt * d.vel->get(j, d.Nx - STENCIL)/d.dx;
@@ -231,6 +268,7 @@ void Solver2d::aplicaReynolds(){
     // * borda superior
     //   du/dt - vel*du/dz = 0
     // u(z, t+dt) = u(z,t) + cou * (u(z+dz,t) - u(z,t) )
+    #pragma omp parallel for private(courantNumber)
     for (int i = 0; i < d.Nx; i++) {
 
         courantNumber = d.dt * d.vel->get(STENCIL, i)/d.dx;
@@ -242,6 +280,7 @@ void Solver2d::aplicaReynolds(){
     // * borda inferior
     //   du/dt + vel*du/dz = 0
     // u(z, t+dt) = u(z,t) - cou * (u(z,t) - u(z-dz,t) )
+    #pragma omp parallel for private(courantNumber)
     for (int i = 0; i < d.Nx; i++) {
 
         courantNumber = d.dt * d.vel->get(d.Nz - STENCIL, i)/d.dx;
@@ -256,7 +295,7 @@ float Solver2d::atenuacao(float x, int borda){
 
     // * Função aplicada nas bordas para reduzir a amplitude da onda
 
-    float fat = 0.0035;
+    float fat = 0.0055;
     return exp(-(pow(fat*(borda - x), 2)));
 
 }
@@ -268,6 +307,7 @@ void Solver2d::aplicaAmortecimento(){
     int borda = 23;
 
     // percorre a faixa superior
+    #pragma omp parallel for collapse(1)
     for(int j = STENCIL; j < borda; j++){
         for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
 
@@ -278,6 +318,7 @@ void Solver2d::aplicaAmortecimento(){
     }
 
     // percorre a faixa inferior
+    #pragma omp parallel for collapse(1)
     for(int j = d.Nz - borda; j <= d.Nz - STENCIL; j++){
         for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
 
@@ -288,6 +329,7 @@ void Solver2d::aplicaAmortecimento(){
     }
 
     // percorre a faixa esquerda
+    #pragma omp parallel for collapse(1)
     for(int j = borda; j < d.Nz - borda; j++){
         for(int i = STENCIL; i <= borda; i++){
 
@@ -298,6 +340,7 @@ void Solver2d::aplicaAmortecimento(){
     }
 
     // percorre a faixa direita
+    #pragma omp parallel for collapse(1)
     for(int j = borda; j < d.Nz - borda; j++){
         for(int i = d.Nx - borda; i <= d.Nx - STENCIL; i++){
 
