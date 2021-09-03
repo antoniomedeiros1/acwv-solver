@@ -50,7 +50,8 @@ void Solver2d::leParametros(string nome){
         // posicao da fonte
         myfile >> this->d.fcorte;
         myfile >> this->d.xs;
-        myfile >> this->d.zs;
+        // myfile >> this->d.zs;
+        this->d.zs = d.Z/2;
 
         // numero de iteracoes
         this->d.Nx = this->d.X/this->d.dx;
@@ -63,8 +64,9 @@ void Solver2d::leParametros(string nome){
         // matriz de velocidades
         for (int j = 0; j < this->d.Nz; j++){
             for (int i = 0; i < this->d.Nx; i++){
-                myfile >> v;
-                this->d.vel->set(j, i, v);
+                // myfile >> v;
+                // this->d.vel->set(j, i, v);
+                this->d.vel->set(j, i, 2200);
             }
         }
 
@@ -231,7 +233,7 @@ void Solver2d::mdf(Dominio d, Grid2d* u_current, Grid2d* u_next, int k){
 
 }
 
-void Solver2d::aplicaReynolds(){
+void Solver2d::aplicaReynolds(Grid2d* u_current, Grid2d* u_next){
 
     // * Função que aplica a condição de contorno não-reflexiva de Reynolds
 
@@ -273,6 +275,7 @@ void Solver2d::aplicaReynolds(){
 
         courantNumber = d.dt * d.vel->get(STENCIL, i)/d.dx;
 
+        // u_next->set(STENCIL, i, u_current->get(STENCIL, i) + courantNumber*(u_current->get(STENCIL+1, i) - u_current->get(STENCIL, i)));
         u_next->set(STENCIL, i, u_current->get(STENCIL, i) + courantNumber*(u_current->get(STENCIL+1, i) - u_current->get(STENCIL, i)));
     
     }
@@ -368,7 +371,7 @@ void Solver2d::solve(){
 
         // * calcula u_next
         this->mdf(d, u_current, u_next, k);
-        this->aplicaReynolds();
+        this->aplicaReynolds(u_current, u_next);
         this->aplicaAmortecimento();
 
         // * armazena na matriz do sismograma
@@ -378,6 +381,7 @@ void Solver2d::solve(){
         
         // * calcula u_current
         this->mdf(d, u_next, u_current, k + 1);
+        this->aplicaReynolds(u_next, u_current);
         this->aplicaAmortecimento();
 
         for (int i = 0; i < d.Nx; i++){

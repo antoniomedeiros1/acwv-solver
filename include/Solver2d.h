@@ -32,7 +32,7 @@ class Solver2d{
 
         void mdf(Dominio d, Grid2d* u_current, Grid2d* u_next, int k);
         float fonte(int x, int z, float k);
-        void aplicaReynolds();
+        void aplicaReynolds(Grid2d* u_current, Grid2d* u_next);
         float atenuacao(float x, int borda);
         void aplicaAmortecimento();
 

@@ -1,5 +1,62 @@
 #include "Solver3d.h"
 
+
+const static char* b64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/" ;
+
+// Converts binary data of length=len to base64 characters.
+// Length of the resultant string is stored in flen
+// (you must pass pointer flen).
+
+char* base64( const void* binaryData, int len, int *flen )
+{
+  const unsigned char* bin = (const unsigned char*) binaryData ;
+  char* res ;
+  
+  int rc = 0 ; // result counter
+  int byteNo ; // I need this after the loop
+  
+  int modulusLen = len % 3 ;
+  int pad = ((modulusLen&1)<<1) + ((modulusLen&2)>>1) ; // 2 gives 1 and 1 gives 2, but 0 gives 0.
+  
+  *flen = 4*(len + pad)/3 ;
+  res = (char*) malloc( *flen + 1 ) ; // and one for the null
+  if( !res )
+  {
+    puts( "ERROR: base64 could not allocate enough memory." ) ;
+    puts( "I must stop because I could not get enough" ) ;
+    return 0;
+  }
+  
+  for( byteNo = 0 ; byteNo <= len-3 ; byteNo+=3 )
+  {
+    unsigned char BYTE0=bin[byteNo];
+    unsigned char BYTE1=bin[byteNo+1];
+    unsigned char BYTE2=bin[byteNo+2];
+    res[rc++]  = b64[ BYTE0 >> 2 ] ;
+    res[rc++]  = b64[ ((0x3&BYTE0)<<4) + (BYTE1 >> 4) ] ;
+    res[rc++]  = b64[ ((0x0f&BYTE1)<<2) + (BYTE2>>6) ] ;
+    res[rc++]  = b64[ 0x3f&BYTE2 ] ;
+  }
+  
+  if( pad==2 )
+  {
+    res[rc++] = b64[ bin[byteNo] >> 2 ] ;
+    res[rc++] = b64[ (0x3&bin[byteNo])<<4 ] ;
+    res[rc++] = '=';
+    res[rc++] = '=';
+  }
+  else if( pad==1 )
+  {
+    res[rc++]  = b64[ bin[byteNo] >> 2 ] ;
+    res[rc++]  = b64[ ((0x3&bin[byteNo])<<4)   +   (bin[byteNo+1] >> 4) ] ;
+    res[rc++]  = b64[ (0x0f&bin[byteNo+1])<<2 ] ;
+    res[rc++] = '=';
+  }
+  
+  res[rc]=0; // NULL TERMINATOR! ;)
+  return res ;
+}
+
 Solver3d::Solver3d(){
 
     // lendo os parametros
@@ -14,9 +71,10 @@ Solver3d::Solver3d(){
     cout << "T  = " << this->d.T  << "s" << endl;
     cout << "dx = " << this->d.dx << "m" << endl;
     cout << "dt = " << this->d.dt << "s" << endl;
-    cout << "Nx = " << this->d.Nx << "m" << endl;
-    cout << "Ny = " << this->d.Ny << "m" << endl;
-    cout << "Nz = " << this->d.Nz << "m" << endl;
+    cout << "Nx = " << this->d.Nx << endl;
+    cout << "Ny = " << this->d.Ny << endl;
+    cout << "Nz = " << this->d.Nz << endl;
+    cout << "Nt = " << this->d.Nt << endl;
     cout << "xs = " << this->d.xs << "m" << endl;
     cout << "ys = " << this->d.ys << "m" << endl;
     cout << "zs = " << this->d.zs << "m" << endl;
@@ -132,7 +190,6 @@ void Solver3d::salvaVTI(Dominio d, Grid3d* u, string nomeDoArq, string info){
 
 void Solver3d::salvaVTIBinary(Dominio d, Grid3d* u, string nomeDoArq, string info){
 
-
     // * Função que gera um arquivo vtk ImageData para o ParaView
 
     ofstream myfile;
@@ -141,27 +198,28 @@ void Solver3d::salvaVTIBinary(Dominio d, Grid3d* u, string nomeDoArq, string inf
 
     if(myfile.is_open()){
 
-        myfile << "<VTKFile type=\"ImageData\" version=\"0.1\" byte_order=\"LittleEndian\">";
-        myfile << "  <ImageData WholeExtent= \"" <<  STENCIL << " " << d.Nx - 1 - STENCIL << " " << STENCIL << " " << d.Ny - 1 - STENCIL << " " << STENCIL << " " << d.Nz - 1 - STENCIL << "\" ";
-        myfile << "Origin = \"" << STENCIL << " " << STENCIL << " " << d.Nz - 1 - STENCIL << "\" ";
-        myfile << "Spacing = \"" << d.dx << " " << d.dy << " " << d.dz << "\">";
-        myfile << "    <Piece Extent = \"" << STENCIL << " " << d.Nx - 1 - STENCIL << " " << STENCIL << " " << d.Ny - 1 - STENCIL << " " << STENCIL << " " << d.Nz - 1 - STENCIL << "\">";
-        myfile << "      <PointData Scalars=\"" + info + "\">";
-        myfile << "        <DataArray type=\"Float32\" Name=\"" + info + "\" format=\"appended\">";
+        myfile << "<VTKFile type=\"ImageData\" version=\"1.0\" byte_order=\"LittleEndian\" header_type=\"UInt32\">\n";
+        myfile << "  <ImageData WholeExtent= \"" <<  0 << " " << d.Nx-1 << " " << 0 << " " << d.Ny-1 << " " << 0 << " " << d.Nz-1 << "\" ";
+        myfile << "Origin = \"" << 0 << " " << 0 << " " << d.Nz-1 << "\" ";
+        myfile << "Spacing = \"" << d.dx << " " << d.dy << " " << d.dz << "\">\n";
+        myfile << "    <Piece Extent = \"" << 0 << " " << d.Nx-1 << " " << 0 << " " << d.Ny-1 << " " << 0 << " " << d.Nz-1 << "\">\n";
+        myfile << "      <PointData Scalars=\"" + info + "\">\n";
+        myfile << "        <DataArray type=\"Float32\" Name=\"" + info + "\" format=\"appended\" offset=\"0\">\n";
 
+        myfile << "        </DataArray>\n";
+        myfile << "      </PointData>\n";
+        myfile << "    </Piece>\n";
+        myfile << "  </ImageData>\n";
+        myfile << "  <AppendedData encoding=\"raw\">\n_";
         // int result_size;
         // char *encoding = base64((char *)u->firstptr(), sizeof(float) * u->getSize(), &result_size);
+        // myfile << result_size;
         // myfile.write(encoding, result_size);
-        // myfile.write((char *) u->firstptr(), u->getSize() * sizeof(double));
-
-        myfile << "        </DataArray>";
-        myfile << "      </PointData>";
-        myfile << "    </Piece>";
-        myfile << "  </ImageData>";
-        myfile << "  <AppendedData> encoding=\"base64\"";
-        myfile.write((char *) u->firstptr(), u->getSize() * sizeof(double));
-        myfile << "  </AppendedData>";
-        myfile << "</VTKFile>";
+        int size = u->getSize()*sizeof(float);
+        myfile << size;
+        myfile.write((char *) u->firstptr(), size);
+        myfile << "\n  </AppendedData>\n";
+        myfile << "</VTKFile>\n";
 
     } else {
         cout << "Erro na gravação do arquivo " << nomeDoArq << ".vti" << endl;
@@ -296,89 +354,96 @@ void Solver3d::aplicaAmortecimento(){
 
     int borda = 20 + STENCIL;
 
-    // plano superior z = 0
-    #pragma omp parallel for collapse(2)
-    for (int k = STENCIL; k <= borda; k++){
-        for(int j = STENCIL; j <= d.Ny - STENCIL; j++){
-            for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
+    #pragma omp parallel 
+    {
 
-                u_current->set(k, j, i, u_current->get(k, j, i)*atenuacao(k, borda));
-                u_next->set(k, j, i, u_next->get(k, j, i)*atenuacao(k, borda));
-                
+        // plano superior z = 0
+        #pragma omp for collapse(2)
+        for (int k = STENCIL; k <= borda; k++){
+            for(int j = STENCIL; j <= d.Ny - STENCIL; j++){
+                for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
+
+                    u_current->set(k, j, i, u_current->get(k, j, i)*atenuacao(k, borda));
+                    u_next->set(k, j, i, u_next->get(k, j, i)*atenuacao(k, borda));
+                    
+                }
             }
         }
-    }
 
-    // plano inferior z = Nz
-    #pragma omp parallel for collapse(2)
-    for (int k = d.Nz - borda; k <= d.Nz - STENCIL; k++){
-        for(int j = STENCIL; j <= d.Ny - STENCIL; j++){
-            for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
+        // plano inferior z = Nz
+        #pragma omp for collapse(2)
+        for (int k = d.Nz - borda; k <= d.Nz - STENCIL; k++){
+            for(int j = STENCIL; j <= d.Ny - STENCIL; j++){
+                for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
 
-                u_current->set(k, j, i, u_current->get(k, j, i)*atenuacao(d.Nz - k, borda));
-                u_next->set(k, j, i, u_next->get(k, j, i)*atenuacao(d.Nz - k, borda));
-                
+                    u_current->set(k, j, i, u_current->get(k, j, i)*atenuacao(d.Nz - k, borda));
+                    u_next->set(k, j, i, u_next->get(k, j, i)*atenuacao(d.Nz - k, borda));
+                    
+                }
             }
         }
-    }
 
-    // plano lateral y = 0
-    #pragma omp parallel for collapse(2)
-    for (int k = STENCIL; k <= d.Nz - STENCIL; k++){
-        for(int j = STENCIL; j <= borda; j++){
-            for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
+        // plano lateral y = 0
+        #pragma omp for collapse(2)
+        for (int k = STENCIL; k <= d.Nz - STENCIL; k++){
+            for(int j = STENCIL; j <= borda; j++){
+                for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
 
-                u_current->set(k, j, i, u_current->get(k, j, i)*atenuacao(j, borda));
-                u_next->set(k, j, i, u_next->get(k, j, i)*atenuacao(j, borda));
-                
+                    u_current->set(k, j, i, u_current->get(k, j, i)*atenuacao(j, borda));
+                    u_next->set(k, j, i, u_next->get(k, j, i)*atenuacao(j, borda));
+                    
+                }
             }
         }
-    }
 
-    // plano lateral y = Ny
-    #pragma omp parallel for collapse(2)
-    for (int k = STENCIL; k <= d.Nz - STENCIL; k++){
-        for(int j = d.Ny - borda; j <= d.Ny - STENCIL; j++){
-            for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
+        // plano lateral y = Ny
+        #pragma omp for collapse(2)
+        for (int k = STENCIL; k <= d.Nz - STENCIL; k++){
+            for(int j = d.Ny - borda; j <= d.Ny - STENCIL; j++){
+                for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
 
-                u_current->set(k, j, i, u_current->get(k, j, i)*atenuacao(d.Ny - j, borda));
-                u_next->set(k, j, i, u_next->get(k, j, i)*atenuacao(d.Ny - j, borda));
-                
+                    u_current->set(k, j, i, u_current->get(k, j, i)*atenuacao(d.Ny - j, borda));
+                    u_next->set(k, j, i, u_next->get(k, j, i)*atenuacao(d.Ny - j, borda));
+                    
+                }
             }
         }
-    }
 
-    // plano lateral x = 0
-    #pragma omp parallel for collapse(2)
-    for (int k = STENCIL; k <= d.Nz - STENCIL; k++){
-        for(int j = STENCIL; j <= d.Ny - STENCIL; j++){
-            for(int i = STENCIL; i <= borda; i++){
+        // plano lateral x = 0
+        #pragma omp for collapse(2)
+        for (int k = STENCIL; k <= d.Nz - STENCIL; k++){
+            for(int j = STENCIL; j <= d.Ny - STENCIL; j++){
+                for(int i = STENCIL; i <= borda; i++){
 
-                u_current->set(k, j, i, u_current->get(k, j, i)*atenuacao(i, borda));
-                u_next->set(k, j, i, u_next->get(k, j, i)*atenuacao(i, borda));
-                
+                    u_current->set(k, j, i, u_current->get(k, j, i)*atenuacao(i, borda));
+                    u_next->set(k, j, i, u_next->get(k, j, i)*atenuacao(i, borda));
+                    
+                }
             }
         }
-    }
 
-    // plano lateral x = Nx
-    #pragma omp parallel for collapse(2)
-    for (int k = STENCIL; k <= d.Nz - STENCIL; k++){
-        for(int j = STENCIL; j < d.Ny - STENCIL; j++){
-            for(int i = d.Nx - borda; i <= d.Nx - STENCIL; i++){
+        // plano lateral x = Nx
+        #pragma omp for collapse(2)
+        for (int k = STENCIL; k <= d.Nz - STENCIL; k++){
+            for(int j = STENCIL; j < d.Ny - STENCIL; j++){
+                for(int i = d.Nx - borda; i <= d.Nx - STENCIL; i++){
 
-                u_current->set(k, j, i, u_current->get(k, j, i)*atenuacao(d.Nx - i, borda));
-                u_next->set(k, j, i, u_next->get(k, j, i)*atenuacao(d.Nx - i, borda));
-                
+                    u_current->set(k, j, i, u_current->get(k, j, i)*atenuacao(d.Nx - i, borda));
+                    u_next->set(k, j, i, u_next->get(k, j, i)*atenuacao(d.Nx - i, borda));
+                    
+                }
             }
         }
+
     }
+
+    
 
 }
 
 void Solver3d::solve(){
 
-    int modk = 50;
+    int modk = 100;
     int t; // iterador temporal
 
     auto inicio = chrono::high_resolution_clock::now();
@@ -389,13 +454,13 @@ void Solver3d::solve(){
         
         // * calcula u_next
         this->mdf3d(u_current, u_next, t);
-        reynolds();
+        // reynolds();
         aplicaAmortecimento();
 
         // * gera arquivo de dados a cada 100 iteracoes em k
         if (t % modk == 0){
             string nomeDoArq = "data" + to_string(t/modk);
-            this->salvaVTI(d, u_current, nomeDoArq, "P-Wave");
+            this->salvaVTIBinary(d, u_current, nomeDoArq, "P-Wave");
         }
         
         // * calcula u_current

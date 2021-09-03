@@ -6,7 +6,6 @@
 #include <chrono>
 
 #include "Solver2d.h"
-// #include "base64.h"
 
 #define STENCIL 3
 

@@ -10,8 +10,7 @@ using namespace std;
 
 int main() {
 
-    // Solver2d solver("semicirculo.txt");
-    // solver.solve();
+    
 
     system("export OMP_NUM_THREADS=8");
 
@@ -26,7 +25,10 @@ int main() {
 
     cout << "\nQuantidade de threads disponiveis: " << t << "\n\n";
 
-    Solver3d solver;
+    // Solver3d solver;
+    // solver.solve();
+
+    Solver2d solver("semicirculo.txt");
     solver.solve();
 
     return 0;
