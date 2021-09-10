@@ -50,8 +50,7 @@ void Solver2d::leParametros(string nome){
         // posicao da fonte
         myfile >> this->d.fcorte;
         myfile >> this->d.xs;
-        // myfile >> this->d.zs;
-        this->d.zs = d.Z/2;
+        myfile >> this->d.zs;
 
         // numero de iteracoes
         this->d.Nx = this->d.X/this->d.dx;
@@ -64,9 +63,9 @@ void Solver2d::leParametros(string nome){
         // matriz de velocidades
         for (int j = 0; j < this->d.Nz; j++){
             for (int i = 0; i < this->d.Nx; i++){
-                // myfile >> v;
-                // this->d.vel->set(j, i, v);
-                this->d.vel->set(j, i, 2200);
+                myfile >> v;
+                this->d.vel->set(j, i, v);
+                // this->d.vel->set(j, i, 2200);
             }
         }
 

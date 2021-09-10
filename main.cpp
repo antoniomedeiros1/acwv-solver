@@ -10,13 +10,10 @@ using namespace std;
 
 int main() {
 
-    
+    system("export OMP_NUM_THREADS=1");
 
-    system("export OMP_NUM_THREADS=8");
-
-    omp_set_num_threads(8);
-	omp_set_dynamic(0);
-	omp_set_schedule(omp_sched_dynamic, 1);
+    omp_set_num_threads(1);
+	  omp_set_dynamic(0);
 
     int t;
     
@@ -25,10 +22,10 @@ int main() {
 
     cout << "\nQuantidade de threads disponiveis: " << t << "\n\n";
 
-    // Solver3d solver;
-    // solver.solve();
+    //Solver3d solver;
+    //solver.solve();
 
-    Solver2d solver("semicirculo.txt");
+    Solver2d solver("double_slit.txt");
     solver.solve();
 
     return 0;

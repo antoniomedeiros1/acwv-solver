@@ -443,7 +443,7 @@ void Solver3d::aplicaAmortecimento(){
 
 void Solver3d::solve(){
 
-    int modk = 100;
+    int modk = 50;
     int t; // iterador temporal
 
     auto inicio = chrono::high_resolution_clock::now();
@@ -460,7 +460,7 @@ void Solver3d::solve(){
         // * gera arquivo de dados a cada 100 iteracoes em k
         if (t % modk == 0){
             string nomeDoArq = "data" + to_string(t/modk);
-            this->salvaVTIBinary(d, u_current, nomeDoArq, "P-Wave");
+            this->salvaVTI(d, u_current, nomeDoArq, "P-Wave");
         }
         
         // * calcula u_current
