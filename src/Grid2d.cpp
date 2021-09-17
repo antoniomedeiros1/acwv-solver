@@ -2,7 +2,7 @@
 #include <cstring>
 using namespace std;
 
-#include "Grid2d.h"
+#include "../include/Grid2d.h"
 
 Grid2d::Grid2d(int nl, int nc){
     this->n_linhas = nl;

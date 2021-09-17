@@ -1,4 +1,4 @@
-#include "Grid3d.h"
+#include "../include/Grid3d.h"
 
 Grid3d::Grid3d(int nl, int nc, int np){
 

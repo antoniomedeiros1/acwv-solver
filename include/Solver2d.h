@@ -29,6 +29,7 @@ class Solver2d{
 
         // metodos
         void leParametros(string nome);
+        void leModelo(string nome);
 
         void mdf(Dominio d, Grid2d* u_current, Grid2d* u_next, int k);
         float fonte(int x, int z, float k);

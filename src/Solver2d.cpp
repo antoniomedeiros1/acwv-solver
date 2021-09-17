@@ -1,9 +1,10 @@
-#include "Solver2d.h"
+#include "../include/Solver2d.h"
 
 Solver2d::Solver2d(string nomeDoArquivo){
 
     // le os parametros do modelo
-    leParametros(nomeDoArquivo);
+    // leParametros(nomeDoArquivo);
+    leModelo(nomeDoArquivo);
 
     // incializa os vetores;
     this->u_current = new Grid2d(this->d.Nz, this->d.Nx);
@@ -27,9 +28,60 @@ void Solver2d::imprimeParametros(){
 
 }
 
+void Solver2d::leModelo(string nome){
+
+    // * funcao que le matriz de velocidades
+
+    ifstream myfile;
+
+    myfile.open("../" + nome);
+
+    if(myfile.is_open()){
+
+        // numero de iteracoes
+        myfile >> this->d.Nx; 
+        myfile >> this->d.Nz; 
+        this->d.Nt = 4000;
+
+        // largura da malha
+        this->d.dx = 1;
+        this->d.dz = 1;
+        this->d.dt = 0.00025;
+
+        // dimensoes do dominio
+        this->d.X = this->d.Nx * this->d.dx;
+        this->d.Z = this->d.Nz * this->d.dz;
+        this->d.T = this->d.Nt * this->d.dt;
+
+        // posicao da fonte
+        this->d.fcorte = 40;
+        this->d.xs = int(this->d.Nx/2);
+        this->d.zs = 25;
+
+        this->d.vel = new Grid2d(this->d.Nz, this->d.Nx);
+        int v;
+
+        // matriz de velocidades
+        for (int j = 0; j < this->d.Nz; j++){
+            for (int i = 0; i < this->d.Nx; i++){
+                myfile >> v;
+                this->d.vel->set(j, i, v);
+                // this->d.vel->set(j, i, 2200); // velocidade constante
+            }
+        }
+
+        myfile.close();
+
+    } else {
+        cerr << "Falha ao abrir arquivo de parametros" << endl;
+        exit;
+    }
+    
+}
+
 void Solver2d::leParametros(string nome){
 
-    // * funcao que le os dados do dominio 2d e a matriz de velocidades
+    // * funcao que le a matriz de velocidades
 
     ifstream myfile;
 
@@ -76,6 +128,7 @@ void Solver2d::leParametros(string nome){
         exit;
     }
     
+
 }
 
 void Solver2d::salvaVTI(Dominio d, Grid2d* grid, string nomeDoArq, string info){

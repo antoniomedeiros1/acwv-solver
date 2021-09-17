@@ -1,4 +1,4 @@
-#include "Solver3d.h"
+#include "../include/Solver3d.h"
 
 
 const static char* b64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/" ;
