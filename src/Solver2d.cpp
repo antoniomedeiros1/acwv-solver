@@ -3,16 +3,18 @@
 Solver2d::Solver2d(string nomeDoArquivo){
 
     // le os parametros do modelo
+    cout << "Lendo parâmetros do modelo...\n";
     // leParametros(nomeDoArquivo);
     leModelo(nomeDoArquivo);
-
+    cout << "Parâmetros lidos com sucesso!\n";
     // incializa os vetores;
+    
     this->u_current = new Grid2d(this->d.Nz, this->d.Nx);
     this->u_next = new Grid2d(this->d.Nz, this->d.Nx);
     this->sis = new Grid2d(this->d.Nt, this->d.Nx);
 
     this->posReceptor = this->d.zs/this->d.dz;
-    this->modk = 100;
+    this->modk = 250;
 
 }
 
@@ -40,12 +42,14 @@ void Solver2d::leModelo(string nome){
 
         // numero de iteracoes
         myfile >> this->d.Nx; 
-        myfile >> this->d.Nz; 
-        this->d.Nt = 4000;
+        myfile >> this->d.Nz;
+        cout << "Nx = " << this->d.Nx << endl;
+        cout << "Nz = " << this->d.Nz << endl;
+        this->d.Nt = 5000;
 
         // largura da malha
-        this->d.dx = 1;
-        this->d.dz = 1;
+        myfile >> this->d.dx;
+        this->d.dz = this->d.dx;
         this->d.dt = 0.00025;
 
         // dimensoes do dominio
@@ -56,14 +60,14 @@ void Solver2d::leModelo(string nome){
         // posicao da fonte
         this->d.fcorte = 40;
         this->d.xs = int(this->d.Nx/2);
-        this->d.zs = 25;
+        this->d.zs = 50;
 
         this->d.vel = new Grid2d(this->d.Nz, this->d.Nx);
-        int v;
+        float v;
 
         // matriz de velocidades
-        for (int j = 0; j < this->d.Nz; j++){
-            for (int i = 0; i < this->d.Nx; i++){
+        for (int i = 0; i < this->d.Nx; i++){
+            for (int j = 0; j < this->d.Nz; j++){
                 myfile >> v;
                 this->d.vel->set(j, i, v);
                 // this->d.vel->set(j, i, 2200); // velocidade constante
@@ -322,15 +326,12 @@ void Solver2d::aplicaReynolds(Grid2d* u_current, Grid2d* u_next){
     // * borda superior
     //   du/dt - vel*du/dz = 0
     // u(z, t+dt) = u(z,t) + cou * (u(z+dz,t) - u(z,t) )
-    #pragma omp parallel for private(courantNumber)
-    for (int i = 0; i < d.Nx; i++) {
-
-        courantNumber = d.dt * d.vel->get(STENCIL, i)/d.dx;
-
+    // #pragma omp parallel for private(courantNumber)
+    // for (int i = 0; i < d.Nx; i++) {
+    //    courantNumber = d.dt * d.vel->get(STENCIL, i)/d.dx;
         // u_next->set(STENCIL, i, u_current->get(STENCIL, i) + courantNumber*(u_current->get(STENCIL+1, i) - u_current->get(STENCIL, i)));
-        u_next->set(STENCIL, i, u_current->get(STENCIL, i) + courantNumber*(u_current->get(STENCIL+1, i) - u_current->get(STENCIL, i)));
-    
-    }
+    //    u_next->set(STENCIL, i, u_current->get(STENCIL, i) + courantNumber*(u_current->get(STENCIL+1, i) - u_current->get(STENCIL, i)));
+    // }
 
     // * borda inferior
     //   du/dt + vel*du/dz = 0
@@ -410,12 +411,15 @@ void Solver2d::aplicaAmortecimento(){
 
 void Solver2d::solve(){
 
-    // gera arquivo para visualização do modelo de velocidades
+    cout << "Salvando modelo de velocidades  em vtk...\n";
     salvaVTI(this->d, this->d.vel, "modelo_velocidades", "Velocidade");
 
+    cout << "Parâmetros:\n";
     cout << "Nx = " << d.Nx << endl;
     cout << "Nz = " << d.Nz << endl;
     cout << "Nt = " << d.Nt << endl;
+
+    cout << "\nIniciando laço temporal...\n";
 
     auto inicio = chrono::high_resolution_clock::now();
 
@@ -444,6 +448,7 @@ void Solver2d::solve(){
         if (k % modk == 0){
             string nomeDoArq = "data" + to_string(k/modk);
             salvaVTI(d, u_current, nomeDoArq, "Amplitude");
+            cout << nomeDoArq << " salvo...";
         }
 
     }
