@@ -29,7 +29,7 @@ void Grid2d::set(int j, int i, float val){
 
 float& Grid2d::operator()(int j, int i)
 {
-    return  mat[j*this->n_cols + i];
+    return mat[j*this->n_cols + i];
 }
 
 void Grid2d::swap(Grid2d &orig)

@@ -9,4 +9,10 @@
 build
 config
 
+# gprof
+analise_2d.txt
+gmon.out
+mdf
+.cache/
+
 .ipynb_checkpoints

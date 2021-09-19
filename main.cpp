@@ -4,16 +4,16 @@
 #include <iostream>
 #include "omp.h"
 
-#include "Solver3d.h"
+#include "include/Solver3d.h"
 
 using namespace std;
 
 int main() {
 
-    system("export OMP_NUM_THREADS=1");
+    system("export OMP_NUM_THREADS=8");
 
-    omp_set_num_threads(1);
-	  omp_set_dynamic(0);
+    omp_set_num_threads(8);
+	omp_set_dynamic(0);
 
     int t;
     
@@ -25,7 +25,8 @@ int main() {
     //Solver3d solver;
     //solver.solve();
 
-    Solver2d solver("double_slit.txt");
+    Solver2d solver("../data-processing/marmousi.txt");
+    // Solver2d solver("planos_paralelos.txt");
     solver.solve();
 
     return 0;

@@ -4,17 +4,18 @@ Solver2d::Solver2d(string nomeDoArquivo){
 
     // le os parametros do modelo
     cout << "Lendo parâmetros do modelo...\n";
+    
     // leParametros(nomeDoArquivo);
     leModelo(nomeDoArquivo);
     cout << "Parâmetros lidos com sucesso!\n";
-    // incializa os vetores;
     
+    // incializa os vetores;
     this->u_current = new Grid2d(this->d.Nz, this->d.Nx);
-    this->u_next = new Grid2d(this->d.Nz, this->d.Nx);
-    this->sis = new Grid2d(this->d.Nt, this->d.Nx);
+    this->u_next    = new Grid2d(this->d.Nz, this->d.Nx);
+    this->sis       = new Grid2d(this->d.Nt, this->d.Nx);
 
     this->posReceptor = this->d.zs/this->d.dz;
-    this->modk = 250;
+    this->modk = 500;
 
 }
 
@@ -22,11 +23,66 @@ Solver2d::~Solver2d(){
 
 }
 
+void Solver2d::solve(){
+
+    cout << "Salvando modelo de velocidades  em vtk...\n";
+    salvaVTI(this->d, this->d.vel, "modelo_velocidades", "Velocidade");
+    cout << "\nIniciando laço temporal...\n";
+
+    imprimeParametros();
+
+    auto inicio = chrono::high_resolution_clock::now();
+
+    for (int k = 0; k <= d.Nt; k += 2){
+
+        // * calcula u_next
+        this->mdf(d, u_current, u_next, k);
+        this->aplicaReynolds(u_current, u_next);
+        this->aplicaAmortecimento();
+
+        // * armazena na matriz do sismograma
+        for (int i = 0; i < d.Nx; i++){
+            sis->set(k, i, u_next->get(this->posReceptor, i));
+        }
+        
+        // * calcula u_current
+        this->mdf(d, u_next, u_current, k + 1);
+        this->aplicaReynolds(u_next, u_current);
+        this->aplicaAmortecimento();
+
+        // for (int i = 0; i < d.Nx; i++){
+        //     sis->set(k + 1, i, u_current->get(this->posReceptor, i));
+        // }
+
+        // * gera arquivo de dados a cada {modk} iteracoes em k
+        if (k % modk == 0){
+            string nomeDoArq = "data" + to_string(k/modk);
+            cout << nomeDoArq << "...\n";
+            salvaVTI(d, u_current, nomeDoArq, "Amplitude");
+        }
+
+    }
+
+    // salvaSismograma(*sis, d);
+
+    cout << "\nArquivos gerados com sucesso!" << endl;
+
+    auto final = chrono::high_resolution_clock::now();
+    chrono::duration<double> intervalo = final - inicio;
+    cout << "\nTempo decorrido: " << intervalo.count() << "s\n";
+
+    
+
+}
+
 void Solver2d::imprimeParametros(){
 
-    cout << "Nx = " << this->d.Nx << endl;
-    cout << "Nz = " << this->d.Nz << endl;
-    cout << "Nt = " << this->d.Nt << endl;
+    std::cout << "Parâmetros da simulação:" << std::endl;
+    cout << "X = " << this->d.X << endl;
+    cout << "Z = " << this->d.Z << endl;
+    cout << "dx = " << this->d.dx << endl;
+    cout << "T = " << this->d.T << endl;
+    cout << "dt = " << this->d.dt << endl;
 
 }
 
@@ -45,12 +101,12 @@ void Solver2d::leModelo(string nome){
         myfile >> this->d.Nz;
         cout << "Nx = " << this->d.Nx << endl;
         cout << "Nz = " << this->d.Nz << endl;
-        this->d.Nt = 5000;
+        this->d.Nt = 20000;
 
         // largura da malha
         myfile >> this->d.dx;
         this->d.dz = this->d.dx;
-        this->d.dt = 0.00025;
+        this->d.dt = 0.0001;
 
         // dimensoes do dominio
         this->d.X = this->d.Nx * this->d.dx;
@@ -59,7 +115,7 @@ void Solver2d::leModelo(string nome){
 
         // posicao da fonte
         this->d.fcorte = 40;
-        this->d.xs = int(this->d.Nx/2);
+        this->d.xs = int(this->d.X/2);
         this->d.zs = 50;
 
         this->d.vel = new Grid2d(this->d.Nz, this->d.Nx);
@@ -223,9 +279,10 @@ void salvaGNUPlot(Dominio d, int k, int modk, string base, Grid2d* u){
     myfile.close();
 }
 
-void salvaBIN(Grid2d sis, Dominio d){
+void Solver2d::salvaSismograma(Grid2d sis, Dominio d){
 
     // * grava binario do sismograma
+    
     ofstream file;
 
     file.open("../sis.bin", ios::out | ios::binary);
@@ -409,56 +466,37 @@ void Solver2d::aplicaAmortecimento(){
 
 }
 
-void Solver2d::solve(){
 
-    cout << "Salvando modelo de velocidades  em vtk...\n";
-    salvaVTI(this->d, this->d.vel, "modelo_velocidades", "Velocidade");
+void Solver2d::salvaEstado(){
 
-    cout << "Parâmetros:\n";
-    cout << "Nx = " << d.Nx << endl;
-    cout << "Nz = " << d.Nz << endl;
-    cout << "Nt = " << d.Nt << endl;
+    // salva o estado de u_current e u_next 
 
-    cout << "\nIniciando laço temporal...\n";
+    ofstream arq;
 
-    auto inicio = chrono::high_resolution_clock::now();
+    arq.open("../state.txt", ios::binary);
 
-    for (int k = 0; k <= d.Nt; k += 2){
-
-        // * calcula u_next
-        this->mdf(d, u_current, u_next, k);
-        this->aplicaReynolds(u_current, u_next);
-        this->aplicaAmortecimento();
-
-        // * armazena na matriz do sismograma
-        for (int i = 0; i < d.Nx; i++){
-            sis->set(k, i, u_next->get(this->posReceptor, i));
-        }
-        
-        // * calcula u_current
-        this->mdf(d, u_next, u_current, k + 1);
-        this->aplicaReynolds(u_next, u_current);
-        this->aplicaAmortecimento();
-
-        for (int i = 0; i < d.Nx; i++){
-            sis->set(k + 1, i, u_current->get(this->posReceptor, i));
-        }
-
-        // * gera arquivo de dados a cada 100 iteracoes em k
-        if (k % modk == 0){
-            string nomeDoArq = "data" + to_string(k/modk);
-            salvaVTI(d, u_current, nomeDoArq, "Amplitude");
-            cout << nomeDoArq << " salvo...";
-        }
-
+    if (arq.is_open()){
+        arq.write((char *) this->u_current, sizeof(Grid2d));
+        arq.write((char *) this->u_next, sizeof(Grid2d));
+        arq.close();
+    } else {
+        cout << "Falha ao salvar estado\n";
     }
 
-    salvaBIN(*sis, d);
+}
 
-    cout << "\nArquivos gerados com sucesso!" << endl;
+void Solver2d::carregaEstado(){
 
-    auto final = chrono::high_resolution_clock::now();
-    chrono::duration<double> intervalo = final - inicio;
-    cout << "\nTempo decorrido: " << intervalo.count() << "s\n";
+    // carrega os vetores de u_current e u_next
+
+    ifstream arq;
+
+    arq.open("../state.txt");
+
+    if (arq.is_open()){
+        
+    } else {
+        std::cout << "Falha ao carregar estado: arquivo inexistente" << std::endl;
+    }
 
 }

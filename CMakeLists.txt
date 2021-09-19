@@ -6,6 +6,7 @@ if (OpenMP_FOUND)
 set(CMAKE_CXX_FLAGS "-fopenmp")
 endif()
 
+## set(CMAKE_CXX_FLAGS "-O3")
 
 ## Voce pode usar o comando file para obter a lista de todos
 ## arquivos na raiz do projeto .cpp e de dentro do  diretorio src
