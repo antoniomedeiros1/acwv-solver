@@ -15,7 +15,7 @@ Solver2d::Solver2d(string nomeDoArquivo){
     this->sis       = new Grid2d(this->d.Nt, this->d.Nx);
 
     this->posReceptor = this->d.zs/this->d.dz;
-    this->modk = 500;
+    this->modk = 200;
 
 }
 
@@ -41,9 +41,9 @@ void Solver2d::solve(){
         this->aplicaAmortecimento();
 
         // * armazena na matriz do sismograma
-        for (int i = 0; i < d.Nx; i++){
-            sis->set(k, i, u_next->get(this->posReceptor, i));
-        }
+        // for (int i = 0; i < d.Nx; i++){
+        //     sis->set(k, i, u_next->get(this->posReceptor, i));
+        // }
         
         // * calcula u_current
         this->mdf(d, u_next, u_current, k + 1);
@@ -71,13 +71,11 @@ void Solver2d::solve(){
     chrono::duration<double> intervalo = final - inicio;
     cout << "\nTempo decorrido: " << intervalo.count() << "s\n";
 
-    
-
 }
 
 void Solver2d::imprimeParametros(){
 
-    std::cout << "Parâmetros da simulação:" << std::endl;
+    cout << "Parâmetros da simulação:" << endl;
     cout << "X = " << this->d.X << endl;
     cout << "Z = " << this->d.Z << endl;
     cout << "dx = " << this->d.dx << endl;
@@ -101,12 +99,12 @@ void Solver2d::leModelo(string nome){
         myfile >> this->d.Nz;
         cout << "Nx = " << this->d.Nx << endl;
         cout << "Nz = " << this->d.Nz << endl;
-        this->d.Nt = 20000;
+        this->d.Nt = 8000;
 
         // largura da malha
         myfile >> this->d.dx;
         this->d.dz = this->d.dx;
-        this->d.dt = 0.0001;
+        this->d.dt = 0.00025;
 
         // dimensoes do dominio
         this->d.X = this->d.Nx * this->d.dx;
@@ -116,7 +114,7 @@ void Solver2d::leModelo(string nome){
         // posicao da fonte
         this->d.fcorte = 40;
         this->d.xs = int(this->d.X/2);
-        this->d.zs = 50;
+        this->d.zs = 250;
 
         this->d.vel = new Grid2d(this->d.Nz, this->d.Nx);
         float v;
@@ -126,7 +124,6 @@ void Solver2d::leModelo(string nome){
             for (int j = 0; j < this->d.Nz; j++){
                 myfile >> v;
                 this->d.vel->set(j, i, v);
-                // this->d.vel->set(j, i, 2200); // velocidade constante
             }
         }
 
@@ -187,7 +184,6 @@ void Solver2d::leParametros(string nome){
         cerr << "Falha ao abrir arquivo de parametros" << endl;
         exit;
     }
-    
 
 }
 
@@ -359,12 +355,11 @@ void Solver2d::aplicaReynolds(Grid2d* u_current, Grid2d* u_next){
     // u(x, t+dt) = u(x,t) + cou * (u(x+dx,t) - u(x,t) )
     //    onde cou = dt*vel/dx
     #pragma omp parallel for private(courantNumber)
-    for(int j = 0; j < d.Nz; j++) {
-
-        courantNumber = d.dt * d.vel->get(j, STENCIL)/d.dx;
-
-        u_next->set(j, STENCIL, u_current->get(j, STENCIL) + courantNumber*(u_current->get(j,STENCIL+1) - u_current->get(j, STENCIL)));
-    
+    for(int j = STENCIL; j < d.Nz - STENCIL; j++){
+        for(int i = STENCIL; i <= STENCIL + 1; i++){
+            courantNumber = d.dt * d.vel->get(j, i)/d.dx;
+            (*u_next)(j, i) = (*u_current)(j, i) + courantNumber*((*u_current)(j, i + 1) - (*u_current)(j, i));
+        }
     }
 
     // * borda direita
@@ -372,34 +367,33 @@ void Solver2d::aplicaReynolds(Grid2d* u_current, Grid2d* u_next){
     // u(x, t+dt) = u(x,t) - cou * (u(x,t) - u(x-dt,t) )
     // Aqui usamos diferencas atrasadas para discretizar do espaco
     #pragma omp parallel for private(courantNumber)
-    for(int j = 0; j < d.Nz; j++) {
-
-        courantNumber = d.dt * d.vel->get(j, d.Nx - STENCIL)/d.dx;
-
-        u_next->set(j, d.Nx-STENCIL, u_current->get(j, d.Nx-STENCIL) - courantNumber*(u_current->get(j, d.Nx-STENCIL) - u_current->get(j, d.Nx-STENCIL-1)));
-    
+    for(int j = STENCIL; j < d.Nz - STENCIL; j++){
+        for(int i = d.Nx - STENCIL - 1; i <= d.Nx - STENCIL; i++){
+            courantNumber = d.dt * d.vel->get(j, i)/d.dx;
+            (*u_next)(j, i) = (*u_current)(j, i) - courantNumber*((*u_current)(j, i) - (*u_current)(j, i - 1));
+        }
     }
 
     // * borda superior
     //   du/dt - vel*du/dz = 0
     // u(z, t+dt) = u(z,t) + cou * (u(z+dz,t) - u(z,t) )
-    // #pragma omp parallel for private(courantNumber)
-    // for (int i = 0; i < d.Nx; i++) {
-    //    courantNumber = d.dt * d.vel->get(STENCIL, i)/d.dx;
-        // u_next->set(STENCIL, i, u_current->get(STENCIL, i) + courantNumber*(u_current->get(STENCIL+1, i) - u_current->get(STENCIL, i)));
-    //    u_next->set(STENCIL, i, u_current->get(STENCIL, i) + courantNumber*(u_current->get(STENCIL+1, i) - u_current->get(STENCIL, i)));
-    // }
+    #pragma omp parallel for private(courantNumber) 
+    for(int i = STENCIL; i < d.Nx - STENCIL; i++){
+        for(int j = STENCIL; j <= STENCIL + 1; j++){
+            courantNumber = d.dt * d.vel->get(j, i)/d.dx;
+            (*u_next)(j, i) = (*u_current)(j, i) + courantNumber*((*u_current)(j + 1, i) - (*u_current)(j, i));
+        }
+    }
 
     // * borda inferior
     //   du/dt + vel*du/dz = 0
     // u(z, t+dt) = u(z,t) - cou * (u(z,t) - u(z-dz,t) )
     #pragma omp parallel for private(courantNumber)
-    for (int i = 0; i < d.Nx; i++) {
-
-        courantNumber = d.dt * d.vel->get(d.Nz - STENCIL, i)/d.dx;
-
-        u_next->set(d.Nz - STENCIL, i, u_current->get(d.Nz-STENCIL, i) - courantNumber*(u_current->get(d.Nz-STENCIL, i) - u_current->get(d.Nz-STENCIL - 1, i)));
-    
+    for(int i = STENCIL; i < d.Nx - STENCIL; i++){
+        for(int j = d.Nz - STENCIL - 1; j <= d.Nz - STENCIL; j++){
+            courantNumber = d.dt * d.vel->get(j, i)/d.dx;
+            (*u_next)(j, i) = (*u_current)(j, i) - courantNumber*((*u_current)(j, i) - (*u_current)(j - 1, i));
+        }
     }
 
 }
