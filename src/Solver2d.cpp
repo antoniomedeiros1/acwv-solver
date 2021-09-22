@@ -2,20 +2,30 @@
 
 Solver2d::Solver2d(string nomeDoArquivo){
 
-    // le os parametros do modelo
     cout << "Lendo parâmetros do modelo...\n";
-    
-    // leParametros(nomeDoArquivo);
     leModelo(nomeDoArquivo);
     cout << "Parâmetros lidos com sucesso!\n";
-    
+
+    // dimensoes reais do dominio
+    this->d.X = this->d.Nx * this->d.dx;
+    this->d.Z = this->d.Nz * this->d.dz;
+
+    // duração da simulação
+    this->d.Nt = 4000;
+    this->d.dt = 0.00025;
+    this->d.T = this->d.Nt * this->d.dt;
+    this->modk = 100;
+
+    // posicao da fonte
+    this->d.fcorte = 40;
+    this->d.xs = int(this->d.X/2);
+    this->d.zs = 250;
+    this->posReceptor = this->d.zs/this->d.dz;
+
     // incializa os vetores;
     this->u_current = new Grid2d(this->d.Nz, this->d.Nx);
     this->u_next    = new Grid2d(this->d.Nz, this->d.Nx);
-    this->sis       = new Grid2d(this->d.Nt, this->d.Nx);
-
-    this->posReceptor = this->d.zs/this->d.dz;
-    this->modk = 200;
+    // this->sis       = new Grid2d(this->d.Nt, this->d.Nx);
 
 }
 
@@ -25,11 +35,11 @@ Solver2d::~Solver2d(){
 
 void Solver2d::solve(){
 
-    cout << "Salvando modelo de velocidades  em vtk...\n";
+    imprimeParametros();
+
+    cout << "Salvando modelo de velocidades...\n";
     salvaVTI(this->d, this->d.vel, "modelo_velocidades", "Velocidade");
     cout << "\nIniciando laço temporal...\n";
-
-    imprimeParametros();
 
     auto inicio = chrono::high_resolution_clock::now();
 
@@ -44,7 +54,7 @@ void Solver2d::solve(){
         // for (int i = 0; i < d.Nx; i++){
         //     sis->set(k, i, u_next->get(this->posReceptor, i));
         // }
-        
+
         // * calcula u_current
         this->mdf(d, u_next, u_current, k + 1);
         this->aplicaReynolds(u_next, u_current);
@@ -76,11 +86,11 @@ void Solver2d::solve(){
 void Solver2d::imprimeParametros(){
 
     cout << "Parâmetros da simulação:" << endl;
-    cout << "X = " << this->d.X << endl;
-    cout << "Z = " << this->d.Z << endl;
-    cout << "dx = " << this->d.dx << endl;
-    cout << "T = " << this->d.T << endl;
-    cout << "dt = " << this->d.dt << endl;
+    cout << "X = " << this->d.X << "m\n";
+    cout << "Z = " << this->d.Z << "m\n"; 
+    cout << "T = " << this->d.T << "s\n";
+    cout << "dx = " << this->d.dx << "m\n";
+    cout << "dt = " << this->d.dt << "s\n";
 
 }
 
@@ -97,25 +107,12 @@ void Solver2d::leModelo(string nome){
         // numero de iteracoes
         myfile >> this->d.Nx; 
         myfile >> this->d.Nz;
-        cout << "Nx = " << this->d.Nx << endl;
-        cout << "Nz = " << this->d.Nz << endl;
-        this->d.Nt = 8000;
 
         // largura da malha
         myfile >> this->d.dx;
         this->d.dz = this->d.dx;
-        this->d.dt = 0.00025;
 
-        // dimensoes do dominio
-        this->d.X = this->d.Nx * this->d.dx;
-        this->d.Z = this->d.Nz * this->d.dz;
-        this->d.T = this->d.Nt * this->d.dt;
-
-        // posicao da fonte
-        this->d.fcorte = 40;
-        this->d.xs = int(this->d.X/2);
-        this->d.zs = 250;
-
+        // matriz de velocidades
         this->d.vel = new Grid2d(this->d.Nz, this->d.Nx);
         float v;
 
@@ -278,7 +275,7 @@ void salvaGNUPlot(Dominio d, int k, int modk, string base, Grid2d* u){
 void Solver2d::salvaSismograma(Grid2d sis, Dominio d){
 
     // * grava binario do sismograma
-    
+
     ofstream file;
 
     file.open("../sis.bin", ios::out | ios::binary);
@@ -297,7 +294,7 @@ float Solver2d::fonte(int x, int z, float k){
 
     // *funcao que simula um pulso sismico na posicao (xs, zs)
 
-    if (x*this->d.dx != this->d.xs || z*this->d.dz != this->d.zs || k*this->d.dt > 0.5){
+    if (x != (int)(this->d.xs/this->d.dx) || z!= (int)(this->d.zs/this->d.dz) || k*this->d.dt > 0.5){
         return 0;
     } 
 
@@ -336,7 +333,7 @@ void Solver2d::mdf(Dominio d, Grid2d* u_current, Grid2d* u_next, int k){
             + 2*u_current->get(j, i) - u_next->get(j, i) - const2 * this->fonte(i, j, k);
 
             u_next->set(j, i, val);
-            
+
         }
     }
 
@@ -402,7 +399,7 @@ float Solver2d::atenuacao(float x, int borda){
 
     // * Função aplicada nas bordas para reduzir a amplitude da onda
 
-    float fat = 0.0055;
+    float fat = 0.0025;
     return exp(-(pow(fat*(borda - x), 2)));
 
 }
@@ -411,16 +408,14 @@ void Solver2d::aplicaAmortecimento(){
 
     // * Percorre as bordas de das matrizes atual e proxima aplicando uma função de atenuação
 
-    int borda = 23;
+    int borda = 70;
 
     // percorre a faixa superior
     #pragma omp parallel for collapse(1)
     for(int j = STENCIL; j < borda; j++){
         for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
-
             u_current->set(j, i, u_current->get(j, i)*atenuacao(j, borda));
             u_next->set(j, i, u_next->get(j, i)*atenuacao(j, borda));
-            
         }
     }
 
@@ -428,10 +423,8 @@ void Solver2d::aplicaAmortecimento(){
     #pragma omp parallel for collapse(1)
     for(int j = d.Nz - borda; j <= d.Nz - STENCIL; j++){
         for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
-
             u_current->set(j, i, u_current->get(j, i)*atenuacao(d.Nz - j, borda));
             u_next->set(j, i, u_next->get(j, i)*atenuacao(d.Nz - j, borda));
-            
         }
     }
 
@@ -439,10 +432,8 @@ void Solver2d::aplicaAmortecimento(){
     #pragma omp parallel for collapse(1)
     for(int j = borda; j < d.Nz - borda; j++){
         for(int i = STENCIL; i <= borda; i++){
-
             u_current->set(j,i, u_current->get(j, i)*atenuacao(i, borda));
             u_next->set(j,i, u_next->get(j, i)*atenuacao(i, borda));
-            
         }
     }
 
@@ -450,10 +441,8 @@ void Solver2d::aplicaAmortecimento(){
     #pragma omp parallel for collapse(1)
     for(int j = borda; j < d.Nz - borda; j++){
         for(int i = d.Nx - borda; i <= d.Nx - STENCIL; i++){
-
             u_current->set(j,i, u_current->get(j, i)*atenuacao((d.Nx - i), borda));
             u_next->set(j,i, u_next->get(j, i)*atenuacao((d.Nx - i), borda));
-            
         }
     }
 
