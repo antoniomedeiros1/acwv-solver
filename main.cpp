@@ -12,7 +12,7 @@ int main() {
 
     system("export OMP_NUM_THREADS=8");
 
-    omp_set_num_threads(6);
+    omp_set_num_threads(8);
 	omp_set_dynamic(0);
 
     int t;
@@ -26,7 +26,8 @@ int main() {
     //solver.solve();
 
     // Solver2d solver("../data-processing/marmousi.txt");
-    Solver2d solver("planos_paralelos.txt");
+    /* Solver2d solver("planos_paralelos.txt"); */
+    Solver2d solver("semicirculo.txt");
     solver.solve();
 
     return 0;

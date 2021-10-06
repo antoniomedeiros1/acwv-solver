@@ -11,10 +11,10 @@ Solver2d::Solver2d(string nomeDoArquivo){
     this->d.Z = this->d.Nz * this->d.dz;
 
     // duração da simulação
-    this->d.Nt = 4000;
+    this->d.Nt = 8000;
     this->d.dt = 0.00025;
     this->d.T = this->d.Nt * this->d.dt;
-    this->modk = 100;
+    this->modk = 200;
 
     // posicao da fonte
     this->d.fcorte = 40;
@@ -25,7 +25,7 @@ Solver2d::Solver2d(string nomeDoArquivo){
     // incializa os vetores;
     this->u_current = new Grid2d(this->d.Nz, this->d.Nx);
     this->u_next    = new Grid2d(this->d.Nz, this->d.Nx);
-    // this->sis       = new Grid2d(this->d.Nt, this->d.Nx);
+    this->sis       = new Grid2d(this->d.Nt, this->d.Nx);
 
 }
 
@@ -128,7 +128,6 @@ void Solver2d::leModelo(string nome){
 
     } else {
         cerr << "Falha ao abrir arquivo de parametros" << endl;
-        exit;
     }
     
 }
@@ -179,7 +178,6 @@ void Solver2d::leParametros(string nome){
 
     } else {
         cerr << "Falha ao abrir arquivo de parametros" << endl;
-        exit;
     }
 
 }
@@ -307,7 +305,6 @@ float Solver2d::fonte(int x, int z, float k){
 
 void Solver2d::mdf(Dominio d, Grid2d* u_current, Grid2d* u_next, int k){
 
-
     // * Função que calcula o u_next pelo u_current
 
     float val, courantNumber, const1, const2;
@@ -336,7 +333,6 @@ void Solver2d::mdf(Dominio d, Grid2d* u_current, Grid2d* u_next, int k){
 
         }
     }
-
 }
 
 void Solver2d::aplicaReynolds(Grid2d* u_current, Grid2d* u_next){
@@ -399,7 +395,7 @@ float Solver2d::atenuacao(float x, int borda){
 
     // * Função aplicada nas bordas para reduzir a amplitude da onda
 
-    float fat = 0.0025;
+    float fat = 0.0055;
     return exp(-(pow(fat*(borda - x), 2)));
 
 }
@@ -408,7 +404,7 @@ void Solver2d::aplicaAmortecimento(){
 
     // * Percorre as bordas de das matrizes atual e proxima aplicando uma função de atenuação
 
-    int borda = 70;
+    int borda = 25;
 
     // percorre a faixa superior
     #pragma omp parallel for collapse(1)
