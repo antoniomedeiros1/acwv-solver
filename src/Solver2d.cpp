@@ -14,7 +14,7 @@ Solver2d::Solver2d(string nomeDoArquivo){
     this->d.Nt = 8000;
     this->d.dt = 0.00025;
     this->d.T = this->d.Nt * this->d.dt;
-    this->modk = 200;
+    this->modk = this->d.Nt/40;
 
     // posicao da fonte
     this->d.fcorte = 40;
@@ -51,18 +51,18 @@ void Solver2d::solve(){
         this->aplicaAmortecimento();
 
         // * armazena na matriz do sismograma
-        // for (int i = 0; i < d.Nx; i++){
-        //     sis->set(k, i, u_next->get(this->posReceptor, i));
-        // }
+        for (int i = 0; i < d.Nx; i++){
+            sis->set(k, i, u_next->get(this->posReceptor, i));
+        }
 
         // * calcula u_current
         this->mdf(d, u_next, u_current, k + 1);
         this->aplicaReynolds(u_next, u_current);
         this->aplicaAmortecimento();
 
-        // for (int i = 0; i < d.Nx; i++){
-        //     sis->set(k + 1, i, u_current->get(this->posReceptor, i));
-        // }
+        for (int i = 0; i < d.Nx; i++){
+            sis->set(k + 1, i, u_current->get(this->posReceptor, i));
+        }
 
         // * gera arquivo de dados a cada {modk} iteracoes em k
         if (k % modk == 0){

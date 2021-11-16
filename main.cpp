@@ -8,7 +8,9 @@
 
 using namespace std;
 
-int main() {
+int main(int argc, char *argv[]) {
+
+    string arq(argv[1]);
 
     system("export OMP_NUM_THREADS=8");
 
@@ -22,12 +24,7 @@ int main() {
 
     cout << "\nQuantidade de threads disponiveis: " << t << "\n\n";
 
-    //Solver3d solver;
-    //solver.solve();
-
-    // Solver2d solver("../data-processing/marmousi.txt");
-    /* Solver2d solver("planos_paralelos.txt"); */
-    Solver2d solver("semicirculo.txt");
+    Solver2d solver(arq);
     solver.solve();
 
     return 0;
