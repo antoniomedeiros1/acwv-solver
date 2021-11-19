@@ -11,8 +11,6 @@ Solver2d::Solver2d(string nomeDoArquivo){
     this->d.Z = this->d.Nz * this->d.dz;
 
     // duração da simulação
-    this->d.Nt = 8000;
-    this->d.dt = 0.00025;
     this->d.T = this->d.Nt * this->d.dt;
     this->modk = this->d.Nt/40;
 
@@ -100,17 +98,19 @@ void Solver2d::leModelo(string nome){
 
     ifstream myfile;
 
-    myfile.open("../" + nome);
+    myfile.open(nome);
 
     if(myfile.is_open()){
 
         // numero de iteracoes
         myfile >> this->d.Nx; 
         myfile >> this->d.Nz;
+        myfile >> this->d.Nt;
 
         // largura da malha
         myfile >> this->d.dx;
         this->d.dz = this->d.dx;
+        myfile >> this->d.dt;
 
         // matriz de velocidades
         this->d.vel = new Grid2d(this->d.Nz, this->d.Nx);
@@ -130,56 +130,6 @@ void Solver2d::leModelo(string nome){
         cerr << "Falha ao abrir arquivo de parametros" << endl;
     }
     
-}
-
-void Solver2d::leParametros(string nome){
-
-    // * funcao que le a matriz de velocidades
-
-    ifstream myfile;
-
-    myfile.open("../" + nome);
-
-    if(myfile.is_open()){
-
-        // dimensoes do dominio
-        myfile >> this->d.X;
-        myfile >> this->d.Z;
-        myfile >> this->d.T;
-
-        // largura da malha
-        myfile >> this->d.dx;
-        myfile >> this->d.dz;
-        myfile >> this->d.dt;
-
-        // posicao da fonte
-        myfile >> this->d.fcorte;
-        myfile >> this->d.xs;
-        myfile >> this->d.zs;
-
-        // numero de iteracoes
-        this->d.Nx = this->d.X/this->d.dx;
-        this->d.Nz = this->d.Z/this->d.dz;
-        this->d.Nt = this->d.T/this->d.dt;
-
-        this->d.vel = new Grid2d(this->d.Nz, this->d.Nx);
-        int v;
-
-        // matriz de velocidades
-        for (int j = 0; j < this->d.Nz; j++){
-            for (int i = 0; i < this->d.Nx; i++){
-                myfile >> v;
-                this->d.vel->set(j, i, v);
-                // this->d.vel->set(j, i, 2200);
-            }
-        }
-
-        myfile.close();
-
-    } else {
-        cerr << "Falha ao abrir arquivo de parametros" << endl;
-    }
-
 }
 
 void Solver2d::salvaVTI(Dominio d, Grid2d* grid, string nomeDoArq, string info){
