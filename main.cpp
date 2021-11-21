@@ -2,7 +2,10 @@
 #define STENCIL 3 
 
 #include <iostream>
+
+#ifdef _OPENMP
 #include "omp.h"
+#endif
 
 #include "include/Solver3d.h"
 
@@ -12,15 +15,14 @@ int main(int argc, char *argv[]) {
 
     string arq(argv[1]);
 
-    system("export OMP_NUM_THREADS=8");
+    //system("export OMP_NUM_THREADS=8");
 
-    omp_set_num_threads(8);
-	omp_set_dynamic(0);
-
-    int t;
-    
+    int t=1;
+    //omp_set_num_threads(8);
+#ifdef _OPENMP
     #pragma omp parallel
     t = omp_get_num_threads();
+#endif
 
     cout << "\nQuantidade de threads disponiveis: " << t << "\n\n";
 

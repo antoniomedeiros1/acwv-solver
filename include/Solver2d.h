@@ -45,6 +45,7 @@ class Solver2d{
         Dominio d;          // estrutura com os parametros 2d
         Grid2d* u_current;  // matriz de dados do estado atual
         Grid2d* u_next;     // matriz de dados do próximo estado
+        Grid2d* f; 
 
         Grid2d* sis;        // matriz para registrar os traços sísmicos
         int posReceptor;    // posicao dos receptores em z

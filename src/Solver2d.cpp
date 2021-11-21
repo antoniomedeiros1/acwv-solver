@@ -1,5 +1,9 @@
 #include "../include/Solver2d.h"
 
+
+#define OPENMP_SCHEDULE dynamic  
+
+
 Solver2d::Solver2d(string nomeDoArquivo){
 
     cout << "Lendo parâmetros do modelo...\n";
@@ -24,7 +28,7 @@ Solver2d::Solver2d(string nomeDoArquivo){
     this->u_current = new Grid2d(this->d.Nz, this->d.Nx);
     this->u_next    = new Grid2d(this->d.Nz, this->d.Nx);
     this->sis       = new Grid2d(this->d.Nt, this->d.Nx);
-
+    this->f         = new Grid2d(this->d.Nz, this->d.Nx);
 }
 
 Solver2d::~Solver2d(){
@@ -40,7 +44,6 @@ void Solver2d::solve(){
     cout << "\nIniciando laço temporal...\n";
 
     auto inicio = chrono::high_resolution_clock::now();
-
     for (int k = 0; k <= d.Nt; k += 2){
 
         // * calcula u_next
@@ -65,17 +68,14 @@ void Solver2d::solve(){
         // * gera arquivo de dados a cada {modk} iteracoes em k
         if (k % modk == 0){
             string nomeDoArq = "data" + to_string(k/modk);
-            cout << nomeDoArq << "...\n";
+            //cout << nomeDoArq << "...\n";
             salvaVTI(d, u_current, nomeDoArq, "Amplitude");
         }
 
     }
-
-    // salvaSismograma(*sis, d);
-
-    cout << "\nArquivos gerados com sucesso!" << endl;
-
+    
     auto final = chrono::high_resolution_clock::now();
+    cout << "\nArquivos gerados com sucesso!" << endl;
     chrono::duration<double> intervalo = final - inicio;
     cout << "\nTempo decorrido: " << intervalo.count() << "s\n";
 
@@ -246,10 +246,10 @@ float Solver2d::fonte(int x, int z, float k){
         return 0;
     } 
 
-    float td = k*this->d.dt - ((2*sqrt(M_PI))/this->d.fcorte);  
-    float fc = (this->d.fcorte/(3*sqrt(M_PI)));
+    float td = k*this->d.dt - ((2.0f*sqrtf(M_PI))/this->d.fcorte);  
+    float fc = (this->d.fcorte/(3.0f*sqrtf(M_PI)));
 
-    return (1.0 - 2.0 * M_PI * pow(M_PI * fc * td, 2))/pow(M_E, M_PI*pow((M_PI*fc*td), 2));
+    return (1.0f - 2.0f * M_PI * powf(M_PI * fc * td, 2.0f))/powf(M_E, M_PI*powf((M_PI*fc*td), 2.0f));
 
 }
 
@@ -257,16 +257,17 @@ void Solver2d::mdf(Dominio d, Grid2d* u_current, Grid2d* u_next, int k){
 
     // * Função que calcula o u_next pelo u_current
 
+    int sizez = d.Nz - STENCIL;
+    int sizex = d.Nx - STENCIL;
     float val, courantNumber, const1, const2;
 
-    #pragma omp parallel for collapse(1) private(val, courantNumber, const1, const2)
-    for (int j = STENCIL; j <= d.Nz - STENCIL; j++){
-        
-        for (int i = STENCIL; i <= d.Nx - STENCIL; i++){
+    #pragma omp parallel for collapse(1) private(val, courantNumber, const1, const2) schedule (OPENMP_SCHEDULE)
+    for (int j = STENCIL; j <= sizez; j++){
+        for (int i = STENCIL; i <= sizex; i++){
 
             courantNumber = d.dt*d.vel->get(j, i)/d.dx;
-            const1 = (pow(courantNumber, 2)/12.0);
-            const2 = pow(d.vel->get(j, i)*d.dt, 2);
+            const1 = (powf(courantNumber, 2.0f)/12.0f);
+            const2 = powf(d.vel->get(j, i)*d.dt, 2.0f);
 
             val = 
             const1 *
@@ -289,64 +290,65 @@ void Solver2d::aplicaReynolds(Grid2d* u_current, Grid2d* u_next){
 
     // * Função que aplica a condição de contorno não-reflexiva de Reynolds
 
-    float courantNumber;
+    
+    #pragma omp parallel 
+    {
+        // * borda esquerda
+        //   du/dt - vel*du/dx = 0
+        // (u(x,t+dt) - u(x,t))/dt = vel*(u(x+dx,t) - u(x,t))/dx
+        // (u(x,t+dt) - u(x,t)) =   dt*(vel*(u(x+dx,t) - u(x,t))/dx
+        // u(x, t+dt) = u(x,t) + cou * (u(x+dx,t) - u(x,t) )
+        //    onde cou = dt*vel/dx
+        #pragma omp for schedule (OPENMP_SCHEDULE)
+        for(int j = STENCIL; j < d.Nz - STENCIL; j++){
+            for(int i = STENCIL; i <= STENCIL + 1; i++){
+                float courantNumber = d.dt * d.vel->get(j, i)/d.dx;
+                (*u_next)(j, i) = (*u_current)(j, i) + courantNumber*((*u_current)(j, i + 1) - (*u_current)(j, i));
+            }
+        }
 
-    // * borda esquerda
-    //   du/dt - vel*du/dx = 0
-    // (u(x,t+dt) - u(x,t))/dt = vel*(u(x+dx,t) - u(x,t))/dx
-    // (u(x,t+dt) - u(x,t)) =   dt*(vel*(u(x+dx,t) - u(x,t))/dx
-    // u(x, t+dt) = u(x,t) + cou * (u(x+dx,t) - u(x,t) )
-    //    onde cou = dt*vel/dx
-    #pragma omp parallel for private(courantNumber)
-    for(int j = STENCIL; j < d.Nz - STENCIL; j++){
-        for(int i = STENCIL; i <= STENCIL + 1; i++){
-            courantNumber = d.dt * d.vel->get(j, i)/d.dx;
-            (*u_next)(j, i) = (*u_current)(j, i) + courantNumber*((*u_current)(j, i + 1) - (*u_current)(j, i));
+        // * borda direita
+        //   du/dt + vel*du/dx = 0
+        // u(x, t+dt) = u(x,t) - cou * (u(x,t) - u(x-dt,t) )
+        // Aqui usamos diferencas atrasadas para discretizar do espaco
+        #pragma omp for schedule (OPENMP_SCHEDULE) 
+        for(int j = STENCIL; j < d.Nz - STENCIL; j++){
+            for(int i = d.Nx - STENCIL - 1; i <= d.Nx - STENCIL; i++){
+                float courantNumber = d.dt * d.vel->get(j, i)/d.dx;
+                (*u_next)(j, i) = (*u_current)(j, i) - courantNumber*((*u_current)(j, i) - (*u_current)(j, i - 1));
+            }
+        }
+
+        // * borda superior
+        //   du/dt - vel*du/dz = 0
+        // u(z, t+dt) = u(z,t) + cou * (u(z+dz,t) - u(z,t) )
+        #pragma omp for schedule (OPENMP_SCHEDULE)
+        for(int i = STENCIL; i < d.Nx - STENCIL; i++){
+            for(int j = STENCIL; j <= STENCIL + 1; j++){
+                float courantNumber = d.dt * d.vel->get(j, i)/d.dx;
+                (*u_next)(j, i) = (*u_current)(j, i) + courantNumber*((*u_current)(j + 1, i) - (*u_current)(j, i));
+            }
+        }
+
+        // * borda inferior
+        //   du/dt + vel*du/dz = 0
+        // u(z, t+dt) = u(z,t) - cou * (u(z,t) - u(z-dz,t) )
+        #pragma omp for schedule (OPENMP_SCHEDULE)
+        for(int i = STENCIL; i < d.Nx - STENCIL; i++){
+            for(int j = d.Nz - STENCIL - 1; j <= d.Nz - STENCIL; j++){
+                float courantNumber = d.dt * d.vel->get(j, i)/d.dx;
+                (*u_next)(j, i) = (*u_current)(j, i) - courantNumber*((*u_current)(j, i) - (*u_current)(j - 1, i));
+            }
         }
     }
-
-    // * borda direita
-    //   du/dt + vel*du/dx = 0
-    // u(x, t+dt) = u(x,t) - cou * (u(x,t) - u(x-dt,t) )
-    // Aqui usamos diferencas atrasadas para discretizar do espaco
-    #pragma omp parallel for private(courantNumber)
-    for(int j = STENCIL; j < d.Nz - STENCIL; j++){
-        for(int i = d.Nx - STENCIL - 1; i <= d.Nx - STENCIL; i++){
-            courantNumber = d.dt * d.vel->get(j, i)/d.dx;
-            (*u_next)(j, i) = (*u_current)(j, i) - courantNumber*((*u_current)(j, i) - (*u_current)(j, i - 1));
-        }
-    }
-
-    // * borda superior
-    //   du/dt - vel*du/dz = 0
-    // u(z, t+dt) = u(z,t) + cou * (u(z+dz,t) - u(z,t) )
-    #pragma omp parallel for private(courantNumber) 
-    for(int i = STENCIL; i < d.Nx - STENCIL; i++){
-        for(int j = STENCIL; j <= STENCIL + 1; j++){
-            courantNumber = d.dt * d.vel->get(j, i)/d.dx;
-            (*u_next)(j, i) = (*u_current)(j, i) + courantNumber*((*u_current)(j + 1, i) - (*u_current)(j, i));
-        }
-    }
-
-    // * borda inferior
-    //   du/dt + vel*du/dz = 0
-    // u(z, t+dt) = u(z,t) - cou * (u(z,t) - u(z-dz,t) )
-    #pragma omp parallel for private(courantNumber)
-    for(int i = STENCIL; i < d.Nx - STENCIL; i++){
-        for(int j = d.Nz - STENCIL - 1; j <= d.Nz - STENCIL; j++){
-            courantNumber = d.dt * d.vel->get(j, i)/d.dx;
-            (*u_next)(j, i) = (*u_current)(j, i) - courantNumber*((*u_current)(j, i) - (*u_current)(j - 1, i));
-        }
-    }
-
 }
 
 float Solver2d::atenuacao(float x, int borda){
 
     // * Função aplicada nas bordas para reduzir a amplitude da onda
 
-    float fat = 0.0055;
-    return exp(-(pow(fat*(borda - x), 2)));
+    float fat = 0.0055f;
+    return expf(-(powf(fat*(borda - x), 2.0f)));
 
 }
 
@@ -356,39 +358,42 @@ void Solver2d::aplicaAmortecimento(){
 
     int borda = 25;
 
-    // percorre a faixa superior
-    #pragma omp parallel for collapse(1)
-    for(int j = STENCIL; j < borda; j++){
-        for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
-            u_current->set(j, i, u_current->get(j, i)*atenuacao(j, borda));
-            u_next->set(j, i, u_next->get(j, i)*atenuacao(j, borda));
+    #pragma omp parallel 
+    {
+        // percorre a faixa superior
+        #pragma omp for collapse(1) schedule (OPENMP_SCHEDULE)
+        for(int j = STENCIL; j < borda; j++){
+            for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
+                u_current->set(j, i, u_current->get(j, i)*atenuacao(j, borda));
+                u_next->set(j, i, u_next->get(j, i)*atenuacao(j, borda));
+            }
         }
-    }
 
-    // percorre a faixa inferior
-    #pragma omp parallel for collapse(1)
-    for(int j = d.Nz - borda; j <= d.Nz - STENCIL; j++){
-        for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
-            u_current->set(j, i, u_current->get(j, i)*atenuacao(d.Nz - j, borda));
-            u_next->set(j, i, u_next->get(j, i)*atenuacao(d.Nz - j, borda));
+        // percorre a faixa inferior
+        #pragma omp for collapse(1) schedule (OPENMP_SCHEDULE)
+        for(int j = d.Nz - borda; j <= d.Nz - STENCIL; j++){
+            for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
+                u_current->set(j, i, u_current->get(j, i)*atenuacao(d.Nz - j, borda));
+                u_next->set(j, i, u_next->get(j, i)*atenuacao(d.Nz - j, borda));
+            }
         }
-    }
 
-    // percorre a faixa esquerda
-    #pragma omp parallel for collapse(1)
-    for(int j = borda; j < d.Nz - borda; j++){
-        for(int i = STENCIL; i <= borda; i++){
-            u_current->set(j,i, u_current->get(j, i)*atenuacao(i, borda));
-            u_next->set(j,i, u_next->get(j, i)*atenuacao(i, borda));
+        // percorre a faixa esquerda
+        #pragma omp for collapse(1) schedule (OPENMP_SCHEDULE)
+        for(int j = borda; j < d.Nz - borda; j++){
+            for(int i = STENCIL; i <= borda; i++){
+                u_current->set(j,i, u_current->get(j, i)*atenuacao(i, borda));
+                u_next->set(j,i, u_next->get(j, i)*atenuacao(i, borda));
+            }
         }
-    }
 
-    // percorre a faixa direita
-    #pragma omp parallel for collapse(1)
-    for(int j = borda; j < d.Nz - borda; j++){
-        for(int i = d.Nx - borda; i <= d.Nx - STENCIL; i++){
-            u_current->set(j,i, u_current->get(j, i)*atenuacao((d.Nx - i), borda));
-            u_next->set(j,i, u_next->get(j, i)*atenuacao((d.Nx - i), borda));
+        // percorre a faixa direita
+        #pragma omp  for collapse(1) schedule (OPENMP_SCHEDULE)
+        for(int j = borda; j < d.Nz - borda; j++){
+            for(int i = d.Nx - borda; i <= d.Nx - STENCIL; i++){
+                u_current->set(j,i, u_current->get(j, i)*atenuacao((d.Nx - i), borda));
+                u_next->set(j,i, u_next->get(j, i)*atenuacao((d.Nx - i), borda));
+            }
         }
     }
 

@@ -141,7 +141,7 @@ void Solver3d::leParametros(string nome){
 
     } else {
         cerr << "Falha ao abrir arquivo de parametros" << endl;
-        exit;
+        exit(1);
     }
     
 }

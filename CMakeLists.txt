@@ -2,9 +2,10 @@ cmake_minimum_required(VERSION 3.10)
 project(mdf)
 find_package(OpenMP)
 
-set(CMAKE_CXX_FLAGS "-O3")
+set (CMAKE_CXX_COMPILER g++)
+set(CMAKE_CXX_FLAGS "-g -fopenmp")
 if (OpenMP_FOUND)
-    set(CMAKE_CXX_FLAGS "-O3 -fopenmp")
+    set(CMAKE_CXX_FLAGS "-march=native -ffast-math -O2 -fopenmp -ftree-vectorize")
 endif()
 
 ## Voce pode usar o comando file para obter a lista de todos

@@ -2,6 +2,8 @@
 #include <cstring>
 using namespace std;
 
+
+
 #include "../include/Grid2d.h"
 
 Grid2d::Grid2d(int nl, int nc){
@@ -18,14 +20,7 @@ Grid2d::~Grid2d(){
     delete [] mat;
 }
 
-float Grid2d::get(int j, int i)
-{
-    return mat[j*this->n_cols + i];
-}
 
-void Grid2d::set(int j, int i, float val){
-    mat[j*this->n_cols + i] = val;
-}
 
 float& Grid2d::operator()(int j, int i)
 {
