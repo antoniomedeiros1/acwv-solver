@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(mdf)
+project(acwv)
 find_package(OpenMP)
 
 set (CMAKE_CXX_COMPILER g++)
@@ -17,4 +17,4 @@ file(GLOB source_files *.cpp src/*.cpp)
 include_directories(include)
 
 # Observe abaixo o uso da variável source_files
-add_executable(mdf.exe ${source_files})
+add_executable(acwv ${source_files})
