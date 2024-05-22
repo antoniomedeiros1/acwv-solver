@@ -3,5 +3,5 @@ rm *.vti
 cmake build
 cd build
 make
-./mdf.exe
+./acwv
 cd ..

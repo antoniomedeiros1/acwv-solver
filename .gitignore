@@ -9,7 +9,8 @@
 build
 config
 
-# gprof
+data/*
+
 analise_2d.txt
 gmon.out
 mdf
