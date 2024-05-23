@@ -1,7 +1,7 @@
 #include "Grid2d.h"
 #include "Grid3d.h"
 
-struct Dominio {
+struct Domain {
 
     float X;       // * Distância em x em metros
     float Y;       // * Distância em y em metros
