@@ -11,6 +11,7 @@ acwv-solver is a simple acoustic waves simulator that implements a Finite Differ
 To compile the code, you need to have the following dependencies installed:
 - CMake
 - MPI (e.g OpenMPI)
+- VTK (libvtk7-dev)
 
 #### Compiling from source
 

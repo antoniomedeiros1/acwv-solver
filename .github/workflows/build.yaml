@@ -1,0 +1,67 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - release/*
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Get version
+        id: version
+        run: |
+          echo ::set-output name=version::${GITHUB_REF#release/}
+        
+      - name: Set up CMake
+        uses: actions/setup-cmake@v1
+        with:
+          cmake-version: '3.21'
+
+      - name: Build project
+        run: |
+          mkdir build
+          cd build
+          cmake ..
+          cmake --build .
+        
+      - name: Archive build
+        run: |
+          tar -czf acwv-${ steps.version.outputs.version }.tar.gz build
+          
+      - name: Generate release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: v${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          release_name: Release v${{ steps.version.outputs.version }}
+          body: |
+            This is an automatically generated release.
+          draft: false
+          prerelease: false
+      
+      - name: Upload release asset
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: v${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./build/acwv.tar.gz
+          asset_name: acwv-${{ steps.version.outputs.version }}.tar.gz
+          asset_content_type: application/octet-stream
+      
+      - name: Merge into main
+        uses: actions/github-script@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            github.git.merge('main', github.context.sha)
+            github.git.deleteRef('heads/release/' + process.env.VERSION)
