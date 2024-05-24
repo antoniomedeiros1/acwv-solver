@@ -67,9 +67,8 @@ jobs:
           asset_content_type: application/octet-stream
       
       - name: Merge into main
-        uses: actions/github-script@v4
+        uses: devmasx/merge-branch@master
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            github.git.merge('main', github.context.sha)
-            github.git.deleteRef('heads/release/' + process.env.VERSION)
+          type: now
+          target_branch: main
+          github_token: ${{ secrets.GITHUB_TOKEN }}
