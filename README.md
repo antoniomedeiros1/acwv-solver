@@ -50,15 +50,16 @@ First, you need to generate the velocity field input file. The velocity field is
 To run the code, you can use the following command:
 
 ```sh
-mpirun -np <number_of_processes> ./acwv-solver <input_file> <output_file> <number_of_steps> <dt>
+mpirun -np <number_of_processes> ./acwv-solver <input_file> <output_folder> <number_of_steps> <dt> [number_of_frames]
 ```
 
 where:
 - `<number_of_processes>` is the number of MPI processes to use.
 - `<input_file>` is the path to the velocity field input file.
-- `<output_file>` is the path to the output file.
+- `<output_folder>` is the path to the folder where the output files will be saved.
 - `<number_of_steps>` is the number of time steps to simulate.
 - `<dt>` is the time step.
+- `[number_of_frames]` is the number of frames to save. If not provided, default is 40.
 
 ## Theoretical Background
 
