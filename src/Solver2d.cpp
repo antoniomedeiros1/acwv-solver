@@ -1,12 +1,13 @@
 #include "../include/Solver2d.h"
 
 
-Solver2d::Solver2d(string input_file, string output_file, int number_of_steps, int dt, int number_of_frames){
+Solver2d::Solver2d(string input_file, string output_folder, int number_of_steps, float dt, int number_of_frames){
     printf("Reading input file: %s\n", input_file.c_str());
+    this->outputFolder = output_folder;
     this->d = Domain();
     this->d.dt = dt;
     this->d.Nt = number_of_steps;
-    readInput(input_file);
+    this->readInputVtkImageData(input_file);
     this->d.X = this->d.Nx * this->d.dx;
     this->d.Z = this->d.Nz * this->d.dz;
     this->d.T = this->d.Nt * this->d.dt;
@@ -24,7 +25,7 @@ Solver2d::~Solver2d(){}
 void Solver2d::solve(){
     printParameters();
     printf("Saving velocity field...\n");
-    saveVTI(this->d, this->d.vel, "velocity_field", "Velocity");
+    saveVTI(this->d, this->d.vel, this->outputFolder + "velocity_field", "Velocity");
     printf("Solving...\n");
     auto start = chrono::high_resolution_clock::now();
     for (int k = 0; k <= d.Nt; k += 2){
@@ -35,7 +36,7 @@ void Solver2d::solve(){
         this->applyReynoldsBC(u_next, u_current);
         this->applyAbsorptionBC();
         if (k % frameRate == 0){
-            string fileName = "data" + to_string(k/frameRate);
+            string fileName = this->outputFolder + "output_data" + to_string(k/frameRate);
             saveVTI(d, u_current, fileName, "Amplitude");
         }
     }
@@ -54,7 +55,7 @@ void Solver2d::printParameters(){
     cout << "dt = " << this->d.dt << "s\n";
 }
 
-void Solver2d::readInput(string input_file){
+void Solver2d::readInputTxt(string input_file){
     ifstream myfile;
     myfile.open(input_file);
     if(myfile.is_open()){
@@ -79,9 +80,29 @@ void Solver2d::readInput(string input_file){
     }
 }
 
-void Solver2d::saveVTI(Domain d, Grid2d* grid, string nomeDoArq, string info){
+void Solver2d::readInputVtkImageData(string input_file){
+    vtkSmartPointer<vtkXMLImageDataReader> reader = vtkSmartPointer<vtkXMLImageDataReader>::New();
+    reader->SetFileName(input_file.c_str());
+    reader->Update();
+    vtkSmartPointer<vtkImageData> imageData = reader->GetOutput();
+    int* extent = imageData->GetExtent();
+    double* spacing = imageData->GetSpacing();
+    this->d.Nx = extent[1] - extent[0] + 1;
+    this->d.Nz = extent[3] - extent[2] + 1;
+    this->d.dx = spacing[0];
+    this->d.dz = spacing[1];
+    vtkSmartPointer<vtkDataArray> data = imageData->GetPointData()->GetScalars();
+    this->d.vel = new Grid2d(this->d.Nz, this->d.Nx);
+    for (int i = 0; i < this->d.Nx; i++){
+        for (int j = 0; j < this->d.Nz; j++){
+            this->d.vel->set(j, i, data->GetTuple1(i + j*this->d.Nx));
+        }
+    }
+}
+
+void Solver2d::saveVTI(Domain d, Grid2d* grid, string outputPath, string info){
     ofstream myfile;
-    myfile.open("../" + nomeDoArq + ".vti");
+    myfile.open(outputPath + ".vti");
     if(myfile.is_open()){
         myfile << "<VTKFile type=\"ImageData\" version=\"0.1\" byte_order=\"LittleEndian\">\n";
         myfile << "  <ImageData WholeExtent= \"" <<  STENCIL << " " << d.Nx - 1 - STENCIL << " " << STENCIL << " " << d.Nz - 1 - STENCIL << " " << 0 << " " << 0 << "\" ";
@@ -101,13 +122,13 @@ void Solver2d::saveVTI(Domain d, Grid2d* grid, string nomeDoArq, string info){
         myfile << "\n  </ImageData>";
         myfile << "\n</VTKFile>";
     } else {
-        cout << "Failed to create " << nomeDoArq << ".vti" << endl;
+        cout << "Failed to create " << outputPath << ".vti" << endl;
     }
 }
 
-void Solver2d::saveVTIbin(Domain d, Grid2d* grid, string nomeDoArq, string info){
+void Solver2d::saveVTIbin(Domain d, Grid2d* grid, string outputPath, string info){
     ofstream myfile;
-    myfile.open("../" + nomeDoArq + ".vti", ios::binary);
+    myfile.open(outputPath + ".vti", ios::binary);
     if(myfile.is_open()){
         myfile << "<VTKFile type=\"ImageData\" version=\"0.1\" byte_order=\"LittleEndian\">\n";
         myfile << "  <ImageData WholeExtent= \"" <<  STENCIL << " " << d.Nx - 1 - STENCIL << " " << STENCIL << " " << d.Nz - 1 - STENCIL << " " << 0 << " " << 0 << "\" ";
@@ -123,7 +144,7 @@ void Solver2d::saveVTIbin(Domain d, Grid2d* grid, string nomeDoArq, string info)
         myfile << "\n  </ImageData>";
         myfile << "\n</VTKFile>";
     } else {
-        cout << "Erro na gravação do arquivo " << nomeDoArq << ".vti" << endl;
+        cout << "Erro na gravação do arquivo " << outputPath << ".vti" << endl;
     }
 }
 
