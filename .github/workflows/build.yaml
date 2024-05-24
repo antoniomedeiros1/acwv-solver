@@ -19,9 +19,9 @@ jobs:
           echo ::set-output name=version::${GITHUB_REF#release/}
         
       - name: Set up CMake
-        uses: actions/setup-cmake@v1
-        with:
-          cmake-version: '3.21'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake
 
       - name: Build project
         run: |
@@ -45,7 +45,7 @@ jobs:
           body: |
             This is an automatically generated release.
           draft: false
-          prerelease: false
+          prerelease: true
       
       - name: Upload release asset
         id: upload-release-asset
