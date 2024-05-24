@@ -1,0 +1,74 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - release/*
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Get version
+        id: version
+        run: |
+          echo ::set-output name=version::${GITHUB_REF##*/}
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get install -y build-essential
+          sudo apt-get install -y libvtk7-dev
+          sudo apt-get install -y openmpi-bin libopenmpi-dev
+
+      - name: Set up CMake
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake
+
+      - name: Build project
+        run: |
+          mkdir build
+          cd build
+          cmake ..
+          cmake --build .
+        
+      - name: Archive build
+        run: |
+          tar -czf acwv-${VERSION##*/}.tar.gz build
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          
+      - name: Generate release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          release_name: Release v${{ steps.version.outputs.version }}
+          body: |
+            This is an automatically generated release.
+          draft: false
+          prerelease: true
+      
+      - name: Upload release asset
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./acwv-${{ steps.version.outputs.version }}.tar.gz
+          asset_name: acwv-${{ steps.version.outputs.version }}.tar.gz
+          asset_content_type: application/octet-stream
+      
+      - name: Merge into main
+        uses: devmasx/merge-branch@master
+        with:
+          type: now
+          target_branch: main
+          github_token: ${{ secrets.GITHUB_TOKEN }}

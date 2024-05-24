@@ -17,3 +17,4 @@ mdf
 .cache/
 
 .ipynb_checkpoints
+**/.venv
