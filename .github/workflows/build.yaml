@@ -16,7 +16,7 @@ jobs:
       - name: Get version
         id: version
         run: |
-          echo ::set-output name=version::${GITHUB_REF#release/}
+          echo ::set-output name=version::${GITHUB_REF##*/}
       
       - name: Install dependencies
         run: |
