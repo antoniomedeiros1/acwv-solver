@@ -62,7 +62,7 @@ jobs:
           GITHUB_TOKEN: v${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./build/acwv.tar.gz
+          asset_path: ./build/acwv-${{ steps.version.outputs.version }}.tar.gz
           asset_name: acwv-${{ steps.version.outputs.version }}.tar.gz
           asset_content_type: application/octet-stream
       
