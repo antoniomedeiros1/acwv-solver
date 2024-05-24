@@ -38,7 +38,9 @@ jobs:
         
       - name: Archive build
         run: |
-          tar -czf acwv-${{ steps.version.outputs.version }}.tar.gz build
+          tar -czf acwv-${VERSION##*/}.tar.gz build
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
           
       - name: Generate release
         id: create_release
