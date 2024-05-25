@@ -2,7 +2,7 @@
 
 acwv-solver is a simple acoustic waves simulator that implements a Finite Difference Method to compute the solution of the [Wave Equation](#wave-equation) for a given velocity field, saving the results in VTK Image Data format, which can be visualized in ParaView. The code is parallelized using MPI and PETSc.
 
-![](assets/wave.png) 
+<img src="https://github.com/antoniomedeiros1/acwv-solver/blob/main/assets/wave.png" width=50% height=50%> 
 
 ## Instructions
 
@@ -65,7 +65,6 @@ where:
 - `[number_of_frames]` is the number of frames to save. If not provided, default is 40.
 
 ## Theoretical Background
-![](assets/wave3d.png)
 
 ### Acoustic Waves
 
