@@ -7,6 +7,7 @@
 
 #include <vtkSmartPointer.h>
 #include <vtkXMLImageDataReader.h>
+#include <vtkXMLImageDataWriter.h>
 #include <vtkImageData.h>
 #include <vtkPointData.h>
 #include <vtkFloatArray.h>
@@ -24,24 +25,24 @@ class Solver2d{
         Solver2d(string input_file, string output_folder, int number_of_steps, float dt, int number_of_frames);
         ~Solver2d();
         void printParameters();
-        void saveVTI(Domain d, Grid2d* u, string outputPath, string info);
-        void saveVTIbin(Domain d, Grid2d* u, string outputPath, string info);
+        void saveVTI(Domain d, Vec u, string outputPath, string info);
+        void saveVTIbin(Domain d, Vec u, string outputPath, string info);
+        void savePVTI(Domain d, Vec u, string outputPath, string info);
         void solve();
     
     private: 
         void readInputTxt(string input_file);
         void readInputVtkImageData(string input_file);
-        void computeNext(Domain d, Grid2d* u_current, Grid2d* u_next, int k);
-        void computeNext(Domain d, Grid2d* u_current, Grid2d* u_next);
+        void computeNext(Domain d, Vec u_current, Vec u_next, int k);
         float source(int x, int z, float k);
-        void applyReynoldsBC(Grid2d* u_current, Grid2d* u_next);
+        void applyReynoldsBC(Vec u_current, Vec u_next);
         float mitigation(float x, int borda);
         void applyAbsorptionBC();
 
         string outputFolder;
         Domain d;
-        Grid2d* u_current;
-        Grid2d* u_next;
-        Grid2d* f; 
+        DM da;
+        Vec u_current;
+        Vec u_next;
         int frameRate;
 };

@@ -1,37 +1,35 @@
-#include "Grid2d.h"
-#include "Grid3d.h"
+#include <petscdm.h>
+#include <petscdmda.h>
+
+// struct Domain {
+//     float X;
+//     float Y;
+//     float Z;
+//     float T;
+//     float c;
+//     float dx;
+//     float dy;
+//     float dz;
+//     float dt;
+//     int Nx;
+//     int Ny;
+//     int Nz;
+//     int Nt;
+//     int n_fontes;
+//     float fcorte;
+//     int xs;
+//     int ys;
+//     int zs;
+//     Grid2d* vel;
+//     float cou;
+//     float c1; 
+//     float c2;
+// };
 
 struct Domain {
-
-    float X;       // * Distância em x em metros
-    float Y;       // * Distância em y em metros
-    float Z;       // * Distância em z em metros
-    float T;       // * Tempo total da duração da simulação em segundos
-
-    float c;       // * Celeridade da onda em m/s
-
-    float dx;      // * Passo em x
-    float dy;      // * Passo em y
-    float dz;      // * Passo em z
-    float dt;      // * Passo no tempo
-
-    int Nx;        // * Numero de iteracoes em x
-    int Ny;        // * Numero de iteracoes em y
-    int Nz;        // * Numero de iteracoes em z
-    int Nt;        // * Numero de iteracoes no tempo
-
-    int n_fontes;  // * Quantidade de fontes
-    float fcorte;  // * Frequencia de pico em Hz dos pulsos
-    int xs;       // * posicao da fonte em x
-    int ys;       // * posicao da fonte em y
-    int zs;       // * posicao da fonte em z
-
-    // * Velocidade variante
-    Grid2d* vel;   // * Matriz 2D de velocidades
-
-    // * Velocidade constante (obsoleto)
-    float cou;     // * Número de courant, para dx = dz
-    float c1; 
-    float c2;
-
+    PetscReal X, Y, Z, T, c, dx, dy, dz, dt;
+    PetscInt Nx, Ny, Nz, Nt, xs, ys, zs;
+    DM da;
+    Vec vel;
+    PetscReal cou, c1, c2;
 };

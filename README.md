@@ -56,14 +56,14 @@ make
 
 ### Input File
 
-First, you need to generate the velocity field input file. The velocity field is a VTK Image Data file that contains the speed of sound at each point of the domain, as well as the grid spacing and size. You can use the 'generate_input.ipynb' Jupyter notebook as reference on how to generate the velocity field. 
+First, you need to generate the velocity field input file. The velocity field is a VTK Image Data file that contains the speed of the wave at each point of the domain, as well as the grid spacing and size. You can use the 'generate_input.ipynb' Jupyter notebook as reference on how to generate the velocity field. 
 
 ### Running the code
 
 To run the code, you can use the following command:
 
 ```sh
-./acwv-solver <input_file> <output_folder> <number_of_steps> <dt> [number_of_frames]
+./acwv <input_file> <output_folder> <number_of_steps> <dt> [number_of_frames]
 ```
 
 where:
