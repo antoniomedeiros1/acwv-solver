@@ -19,6 +19,7 @@ You can download the available binary for Linux from the [releases page](https:/
 #### Dependencies
 
 To compile the code, you need to have the following dependencies installed:
+- pkg-config
 - CMake
 - VTK (libvtk7-dev)
 - ParaView (optional, for visualization)

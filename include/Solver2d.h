@@ -33,7 +33,8 @@ class Solver2d{
     private: 
         void readInputTxt(string input_file);
         void readInputVtkImageData(string input_file);
-        void computeNext(Domain d, Vec u_current, Vec u_next, int k);
+        void computeNext(Domain d, int k);
+        void computeNextInverted(Domain d, int k);
         float source(int x, int z, float k);
         void applyReynoldsBC(Vec u_current, Vec u_next);
         float mitigation(float x, int borda);
@@ -43,6 +44,8 @@ class Solver2d{
         Domain d;
         DM da;
         Vec u_current;
+        Vec u_current_local;
         Vec u_next;
+        Vec u_next_local;
         int frameRate;
 };

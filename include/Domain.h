@@ -29,7 +29,7 @@
 struct Domain {
     PetscReal X, Y, Z, T, c, dx, dy, dz, dt;
     PetscInt Nx, Ny, Nz, Nt, xs, ys, zs;
-    DM da;
     Vec vel;
+    Vec vel_local;
     PetscReal cou, c1, c2;
 };
