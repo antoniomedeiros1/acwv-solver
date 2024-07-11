@@ -12,6 +12,8 @@
 #include <vtkPointData.h>
 #include <vtkFloatArray.h>
 #include <vtkDataArray.h>
+#include <petscdm.h>
+#include <petscdmda.h>
 
 #include "Domain.h"
 
@@ -40,6 +42,11 @@ class Solver2d{
         float mitigation(float x, int borda);
         void applyAbsorptionBC();
 
+        PetscReal X, Y, Z, T, c, dx, dy, dz, dt;
+        PetscInt Nx, Ny, Nz, Nt, xs, ys, zs;
+        Vec vel;
+        Vec vel_local;
+        PetscReal cou, c1, c2;
         string outputFolder;
         Domain d;
         DM da;
