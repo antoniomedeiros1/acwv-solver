@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
         string output_folder = "../data/";
         int number_of_steps = 8000;
         float dt = 0.00025;
-        int number_of_frames = 40;
+        int number_of_frames = 20;
         Solver2d solver(input_file, output_folder, number_of_steps, dt, number_of_frames);
         solver.solve();
         // printf("Usage: %s <input_file> <output_file> <number_of_steps> <dt> [number_of_frames]\n", argv[0]);

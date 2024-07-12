@@ -15,8 +15,6 @@
 #include <petscdm.h>
 #include <petscdmda.h>
 
-#include "Domain.h"
-
 #define STENCIL 3
 
 using namespace std;
@@ -27,16 +25,16 @@ class Solver2d{
         Solver2d(string input_file, string output_folder, int number_of_steps, float dt, int number_of_frames);
         ~Solver2d();
         void printParameters();
-        void saveVTI(Domain d, Vec u, string outputPath, string info);
-        void saveVTIbin(Domain d, Vec u, string outputPath, string info);
-        void savePVTI(Domain d, Vec u, string outputPath, string info);
+        void saveVTI(Vec u, string outputPath, string info);
+        void saveVTIbin(Vec u, string outputPath, string info);
+        void savePVTI(Vec u, string outputPath, string info);
         void solve();
     
     private: 
         void readInputTxt(string input_file);
         void readInputVtkImageData(string input_file);
-        void computeNext(Domain d, int k);
-        void computeNextInverted(Domain d, int k);
+        void computeNext(int k);
+        void computeNextInverted(int k);
         float source(int x, int z, float k);
         void applyReynoldsBC(Vec u_current, Vec u_next);
         float mitigation(float x, int borda);
@@ -48,7 +46,6 @@ class Solver2d{
         Vec vel_local;
         PetscReal cou, c1, c2;
         string outputFolder;
-        Domain d;
         DM da;
         Vec u_current;
         Vec u_current_local;

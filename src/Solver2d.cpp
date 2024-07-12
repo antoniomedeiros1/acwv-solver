@@ -6,7 +6,6 @@ Solver2d::Solver2d(string input_file, string output_folder, int number_of_steps,
     int nprocs;
     MPI_Comm_size(PETSC_COMM_WORLD, &nprocs);
     this->outputFolder = output_folder;
-    this->d = Domain();
     printf("Reading input file: %s\n", input_file.c_str());
     this->readInputVtkImageData(input_file);
     this->dt = dt;
@@ -38,21 +37,21 @@ void Solver2d::solve(){
         printParameters();
         printf("Saving velocity field...\n");
     }
-    saveVTI(this->d, this->vel, this->outputFolder + "velocity_field.vti", "Velocity");
+    // saveVTI(this->vel, this->outputFolder + "velocity_field.vti", "Velocity");
     if (rank == 0) {
         printf("Solving...\n");
     }
     auto start = chrono::high_resolution_clock::now();
     for (int k = 0; k <= Nt; k += 2){
-        this->computeNext(d, k);
+        this->computeNext(k);
         // this->applyReynoldsBC(u_current, u_next);
         // this->applyAbsorptionBC();
-        this->computeNextInverted(d, k + 1);
+        this->computeNextInverted(k + 1);
         // this->applyReynoldsBC(u_next, u_current);
         // this->applyAbsorptionBC();
         if (k % frameRate == 0){
             string fileName = this->outputFolder + "output_data_" + to_string(rank) + "_" + to_string(k/frameRate) + ".vti";
-            saveVTI(d, u_current, fileName, "Amplitude");
+            // saveVTI(u_current, fileName, "Amplitude");
         }
     }
     auto final = chrono::high_resolution_clock::now();
@@ -102,38 +101,57 @@ void Solver2d::printParameters(){
 
 void Solver2d::readInputVtkImageData(string input_file){
     int rank;
+    int size[2];
+    double dxz[2];
     MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
-    vtkSmartPointer<vtkXMLImageDataReader> reader = vtkSmartPointer<vtkXMLImageDataReader>::New();
-    reader->SetFileName(input_file.c_str());
-    reader->Update();
-    vtkSmartPointer<vtkImageData> imageData = reader->GetOutput();
+    PetscScalar *velArray;
+    PetscInt *indexArray;
     if (rank == 0){
+        vtkSmartPointer<vtkDataArray> data;
+        vtkSmartPointer<vtkXMLImageDataReader> reader;
+        vtkSmartPointer<vtkImageData> imageData;
+        reader = vtkSmartPointer<vtkXMLImageDataReader>::New();
+        reader->SetFileName(input_file.c_str());
+        reader->Update();
+        imageData = reader->GetOutput();
         int* extent = imageData->GetExtent();
         double* spacing = imageData->GetSpacing();
-        this->Nx = extent[1] - extent[0] + 1;
-        this->Nz = extent[3] - extent[2] + 1;
-        this->dx = spacing[0];
-        this->dz = spacing[1];
+        size[0] = extent[1] - extent[0] + 1;
+        size[1] = extent[3] - extent[2] + 1;
+        dxz[0] = spacing[0];
+        dxz[1] = spacing[1];
+        data = imageData->GetPointData()->GetScalars();
+        velArray = new PetscScalar[size[0]*size[1]];
+        indexArray = new PetscInt[size[0]*size[1]];
+        int k = 0;
+        for (int i = 0; i < this->Nz; i++){
+            for (int j = 0; j < this->Nx; j++){
+                indexArray[k] = i*this->Nx + j;
+                velArray[k] = (PetscScalar)data->GetTuple1(i*this->Nx + j);
+                k++;
+            }
+        }
     }
-    vtkSmartPointer<vtkDataArray> data = imageData->GetPointData()->GetScalars();
+    MPI_Bcast(size, 2, MPI_INT, 0, PETSC_COMM_WORLD);
+    MPI_Bcast(dxz, 2, MPI_DOUBLE, 0, PETSC_COMM_WORLD);
+    this->Nx = size[0];
+    this->Nz = size[1];
+    this->dx = dxz[0];
+    this->dz = dxz[1];
     // PetscScalar **velArray;
     DMDACreate2d(PETSC_COMM_WORLD, DM_BOUNDARY_NONE, DM_BOUNDARY_NONE, DMDA_STENCIL_STAR, this->Nz, this->Nx, PETSC_DECIDE, PETSC_DECIDE, 1, 1, NULL, NULL, &this->da);
     printf("Rank: %d\n", rank);
-    DMDASetStencilWidth(this->da, STENCIL);
+    DMDASetStencilWidth(this->da, 2);
     DMSetUp(this->da);
     DMCreateGlobalVector(this->da, &this->vel);
     DMCreateLocalVector(this->da, &this->vel_local);
-    PetscScalar velArray[this->Nz * this->Nx];
-    PetscInt indexArray[this->Nz * this->Nx];
-    int k = 0;
-    for (int i = 0; i < this->Nz; i++){
-        for (int j = 0; j < this->Nx; j++){
-            indexArray[k] = i*this->Nx + j;
-            velArray[k] = (PetscScalar)data->GetTuple1(i*this->Nx + j);
-            k++;
-        }
+    if (rank == 0){
+        // PetscScalar velArray[this->Nz * this->Nx];
+        // PetscInt indexArray[this->Nz * this->Nx];
+        VecSetValues(this->vel, this->Nz*this->Nx, indexArray, velArray, INSERT_VALUES);
+        delete[] velArray;
+        delete[] indexArray;
     }
-    VecSetValues(this->vel, this->Nz*this->Nx, indexArray, velArray, INSERT_VALUES);
     VecAssemblyBegin(this->vel);
     VecAssemblyEnd(this->vel);
     DMGlobalToLocalBegin(this->da, this->vel, INSERT_VALUES, this->vel_local);
@@ -168,7 +186,7 @@ void Solver2d::readInputVtkImageData(string input_file){
 //     }
 // }
 
-void Solver2d::saveVTI(Domain d, Vec grid, string outputPath, string info){
+void Solver2d::saveVTI(Vec grid, string outputPath, string info){
     vtkSmartPointer<vtkImageData> imageData = vtkSmartPointer<vtkImageData>::New();
     PetscInt NxStart, NzStart, Nx, Nz;
     DMDAGetCorners(da, &NzStart, &NxStart, NULL, &Nz, &Nx, NULL);
@@ -196,7 +214,7 @@ void Solver2d::saveVTI(Domain d, Vec grid, string outputPath, string info){
     writer->Write();
 }
 
-void Solver2d::saveVTIbin(Domain d, Vec grid, string outputPath, string info){
+void Solver2d::saveVTIbin(Vec grid, string outputPath, string info){
     vtkSmartPointer<vtkImageData> imageData = vtkSmartPointer<vtkImageData>::New();
     imageData->SetExtent(STENCIL, Nx - 1 - STENCIL, STENCIL, Nz - 1 - STENCIL, 0, 0);
     imageData->SetOrigin(STENCIL*dx, (Nz - 1)*dz, 0);
@@ -231,7 +249,7 @@ float Solver2d::source(int x, int z, float k){
     return (1.0f - 2.0f * M_PI * powf(M_PI * fc * td, 2.0f))/powf(M_E, M_PI*powf((M_PI*fc*td), 2.0f));
 }
 
-void Solver2d::computeNext(Domain d, int k){
+void Solver2d::computeNext(int k){
     int sizez = Nz - STENCIL;
     int sizex = Nx - STENCIL;
     float val, courantNumber, const1, const2;
@@ -243,10 +261,15 @@ void Solver2d::computeNext(Domain d, int k){
     DMDAVecGetArray(da, u_current_local, &u_currentArray);
     DMDAVecGetArray(da, u_next_local, &u_nextArray);
     DMDAVecGetArray(da, vel_local, &velArray);
-    PetscInt NzStart, NxStart, Nz, Nx;
-    DMDAGetCorners(da, &NzStart, &NxStart, NULL, &Nz, &Nx, NULL);
-    for (int j = NzStart + STENCIL; j <= NzStart + Nz - STENCIL; j++){
-        for (int i = NxStart + STENCIL; i <= NxStart + Nx - STENCIL; i++){
+    PetscInt NzStart, NxStart, NzSize, NxSize;
+    DMDAGetCorners(da, &NzStart, &NxStart, NULL, &NzSize, &NxSize, NULL);
+    for (int j = NzStart; j < NzStart + NzSize; j++){
+        for (int i = NxStart; i < NxStart + NxSize; i++){
+            if (j < 2 || j >= Nz - 2 || i < 2 || i >= Nx - 2){
+                u_currentArray[j][i] = 0;
+                u_nextArray[j][i] = 0;
+                continue;
+            }
             courantNumber = dt*velArray[j][i]/dx;
             const1 = (powf(courantNumber, 2.0f)/12.0f);
             const2 = powf(velArray[j][i]*dt, 2.0f);
@@ -272,7 +295,7 @@ void Solver2d::computeNext(Domain d, int k){
     DMLocalToGlobalEnd(da,u_next_local,INSERT_VALUES,u_next);
 }
 
-void Solver2d::computeNextInverted(Domain d, int k){
+void Solver2d::computeNextInverted(int k){
     int sizez = Nz - STENCIL;
     int sizex = Nx - STENCIL;
     float val, courantNumber, const1, const2;
@@ -284,10 +307,15 @@ void Solver2d::computeNextInverted(Domain d, int k){
     DMDAVecGetArray(da, u_current_local, &u_nextArray);
     DMDAVecGetArray(da, u_next_local, &u_currentArray);
     DMDAVecGetArray(da, vel_local, &velArray);
-    PetscInt NzStart, NxStart, Nz, Nx;
-    DMDAGetCorners(da, &NzStart, &NxStart, NULL, &Nz, &Nx, NULL);
-    for (int j = NzStart + STENCIL; j <= NzStart + Nz - STENCIL; j++){
-        for (int i = NxStart + STENCIL; i <= NxStart + Nx - STENCIL; i++){
+    PetscInt NzStart, NxStart, NzSize, NxSize;
+    DMDAGetCorners(da, &NzStart, &NxStart, NULL, &NzSize, &NxSize, NULL);
+    for (int j = NzStart; j < NzStart + NzSize; j++){
+        for (int i = NxStart; i < NxStart + NxSize; i++){
+            if (j < 2 || j >= Nz - 2 || i < 2 || i >= Nx - 2){
+                u_currentArray[j][i] = 0;
+                u_nextArray[j][i] = 0;
+                continue;
+            }
             courantNumber = dt*velArray[j][i]/dx;
             const1 = (powf(courantNumber, 2.0f)/12.0f);
             const2 = powf(velArray[j][i]*dt, 2.0f);
