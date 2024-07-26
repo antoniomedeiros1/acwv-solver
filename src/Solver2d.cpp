@@ -13,8 +13,10 @@ Solver2d::Solver2d(string input_file, string output_folder, int number_of_steps,
     this->Z = this->Nz * this->dz;
     this->T = this->Nt * this->dt;
     this->frameRate = this->Nt/number_of_frames;
-    this->xs = int(this->X/2);
-    this->zs = int(this->Z/2);
+    // this->xs = int(this->X/2);
+    // this->zs = int(this->Z/2);
+    this-> xs = 500;
+    this-> zs = 500;
     DMCreateGlobalVector(this->da, &this->u_current);
     DMCreateLocalVector(this->da, &this->u_current_local);
     DMCreateGlobalVector(this->da, &this->u_next);
@@ -36,22 +38,23 @@ void Solver2d::solve(){
         printParameters();
         printf("Saving velocity field...\n");
     }
-    // saveVTI(this->vel, this->outputFolder + "velocity_field.vti", "Velocity");
+    saveVTI(this->vel, this->outputFolder + "velocity_field.vti", "Velocity");
     if (rank == 0) {
         printf("Solving...\n");
     }
     auto start = chrono::high_resolution_clock::now();
-    for (int k = 0; k <= Nt; k += 2){
+    for (int k = 0; k <= Nt; k += 1){
         this->computeNext(k);
         // this->applyReynoldsBC(u_current, u_next);
         // this->applyAbsorptionBC();
-        this->computeNextInverted(k + 1);
+        // this->computeNextInverted(k + 1);
         // this->applyReynoldsBC(u_next, u_current);
         // this->applyAbsorptionBC();
         if (k % frameRate == 0){
             string fileName = this->outputFolder + "output_data_" + to_string(rank) + "_" + to_string(k/frameRate) + ".vti";
-            // saveVTI(u_current, fileName, "Amplitude");
+            saveVTI(u_current, fileName, "Amplitude");
         }
+        VecSwap(this->u_current, this->u_next);
     }
     auto final = chrono::high_resolution_clock::now();
     PetscFinalize();
@@ -91,14 +94,14 @@ void Solver2d::readInputVtkImageData(string input_file){
     this->Nz = extent[3] - extent[2] + 1;
     this->dx = spacing[0];
     this->dz = spacing[1];
-    DMDACreate2d(PETSC_COMM_WORLD, DM_BOUNDARY_NONE, DM_BOUNDARY_NONE, DMDA_STENCIL_STAR, this->Nz, this->Nx, PETSC_DECIDE, PETSC_DECIDE, 1, 1, NULL, NULL, &this->da);
+    DMDACreate2d(PETSC_COMM_WORLD, DM_BOUNDARY_NONE, DM_BOUNDARY_NONE, DMDA_STENCIL_STAR, this->Nx, this->Nz, PETSC_DECIDE, PETSC_DECIDE, 1, 1, NULL, NULL, &this->da);
     DMDASetStencilWidth(this->da, STENCIL);
     DMSetFromOptions(this->da);
     DMSetUp(this->da);
     DMCreateGlobalVector(this->da, &this->vel);
     DMCreateLocalVector(this->da, &this->vel_local);
     int NxStart, NzStart, NxEnd, NzEnd;
-    DMDAGetCorners(this->da, &NzStart, &NxStart, NULL, &NzEnd, &NxEnd, NULL);
+    DMDAGetCorners(this->da, &NxStart, &NzStart, NULL, &NxEnd, &NzEnd, NULL);
     // VecGetArray(this->vel_local, &velArray);
     if (rank == 0){
         PetscScalar *velArray;
@@ -123,7 +126,7 @@ void Solver2d::readInputVtkImageData(string input_file){
 
 void Solver2d::saveVTI(Vec grid, string outputPath, string info){
     PetscInt NxStart, NzStart, NxEnd, NzEnd;
-    DMDAGetCorners(da, &NzStart, &NxStart, NULL, &NzEnd, &NxEnd, NULL);
+    DMDAGetCorners(da, &NxStart, &NzStart, NULL, &NxEnd, &NzEnd, NULL);
     vtkSmartPointer<vtkImageData> imageData = vtkSmartPointer<vtkImageData>::New();
     imageData->SetExtent(NxStart, NxStart + NxEnd - 1, NzStart, NzStart + NzEnd - 1, 0, 0);
     imageData->SetOrigin(NxStart*dx, NzStart*dz, 0);
@@ -142,6 +145,7 @@ void Solver2d::saveVTI(Vec grid, string outputPath, string info){
     VecRestoreArray(grid, &array);
     imageData->GetPointData()->SetScalars(data);
     vtkSmartPointer<vtkXMLImageDataWriter> writer = vtkSmartPointer<vtkXMLImageDataWriter>::New();
+    writer->SetDataModeToAscii();
     writer->SetFileName(outputPath.c_str());
     writer->SetInputData(imageData);
     writer->Write();
@@ -197,19 +201,19 @@ void Solver2d::computeNext(int k){
     DMDAVecGetArray(da, u_next_local, &u_nextArray);
     DMDAVecGetArray(da, vel_local, &velArray);
     PetscInt NzStart, NxStart, NzEnd, NxEnd;
-    DMDAGetCorners(da, &NzStart, &NxStart, NULL, &NzEnd, &NxEnd, NULL);
+    DMDAGetCorners(da, &NxStart, &NzStart, NULL, &NxEnd, &NzEnd, NULL);
     NzEnd = NzStart + NzEnd;
     NxEnd = NxStart + NxEnd;
-    if (NzStart == 0){
+    if (NzStart < STENCIL){
         NzStart = STENCIL;
     }
-    if (NxStart == 0){
+    if (NxStart < STENCIL){
         NxStart = STENCIL;
     }
-    if (NzEnd == this->Nz){
+    if (NzEnd > this->Nz - STENCIL){
         NzEnd = NzEnd - STENCIL;
     }
-    if (NxEnd == this->Nx){
+    if (NxEnd > this->Nx - STENCIL){
         NxEnd = NxEnd - STENCIL;
     }
     for (int j = NzStart; j < NzEnd; j++){
@@ -230,8 +234,8 @@ void Solver2d::computeNext(int k){
             u_nextArray[j][i] = val;
         }
     }
-    DMDAVecRestoreArray(da, u_current_local, &u_nextArray);
-    DMDAVecRestoreArray(da, u_next_local, &u_currentArray);
+    DMDAVecRestoreArray(da, u_current_local, &u_currentArray);
+    DMDAVecRestoreArray(da, u_next_local, &u_nextArray);
 
     DMLocalToGlobalBegin(da,u_current_local,INSERT_VALUES,u_current);
     DMLocalToGlobalEnd(da,u_current_local,INSERT_VALUES,u_current);
@@ -254,19 +258,19 @@ void Solver2d::computeNextInverted(int k){
     DMDAVecGetArray(da, u_next_local, &u_currentArray);
     DMDAVecGetArray(da, vel_local, &velArray);
     PetscInt NzStart, NxStart, NzEnd, NxEnd;
-    DMDAGetCorners(da, &NzStart, &NxStart, NULL, &NzEnd, &NxEnd, NULL);
+    DMDAGetCorners(da, &NxStart, &NzStart, NULL, &NxEnd, &NzEnd, NULL);
     NzEnd = NzStart + NzEnd;
     NxEnd = NxStart + NxEnd;
-    if (NzStart == 0){
+    if (NzStart < STENCIL){
         NzStart = STENCIL;
     }
-    if (NxStart == 0){
+    if (NxStart < STENCIL){
         NxStart = STENCIL;
     }
-    if (NzEnd == this->Nz){
+    if (NzEnd > this->Nz - STENCIL){
         NzEnd = NzEnd - STENCIL;
     }
-    if (NxEnd == this->Nx){
+    if (NxEnd > this->Nx - STENCIL){
         NxEnd = NxEnd - STENCIL;
     }
     for (int j = NzStart; j < NzEnd; j++){
@@ -302,7 +306,7 @@ void Solver2d::applyReynoldsBC(Vec u_current, Vec u_next){
     DMDAVecGetArray(this->da, u_next, &u_nextArray);
     DMDAVecGetArray(this->da, this->vel, &velArray);
     PetscInt NzStart, NxStart, Nz, Nx;
-    DMDAGetCorners(this->da, &NzStart, &NxStart, NULL, &Nz, &Nx, NULL);
+    DMDAGetCorners(this->da, &NxStart, &NzStart, NULL, &Nx, &Nz, NULL);
     for(int j = STENCIL; j < Nz - STENCIL; j++){
         for(int i = STENCIL; i <= STENCIL + 1; i++){
             // float courantNumber = dt * vel->get(j, i)/dx;
