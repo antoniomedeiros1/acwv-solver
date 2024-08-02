@@ -38,7 +38,7 @@ void Solver2d::solve(){
         printParameters();
         printf("Saving velocity field...\n");
     }
-    saveVTI(this->vel, this->outputFolder + "velocity_field.vti", "Velocity");
+    // saveVTI(this->vel, this->outputFolder + "velocity_field.vti", "Velocity");
     if (rank == 0) {
         printf("Solving...\n");
     }
@@ -52,12 +52,13 @@ void Solver2d::solve(){
         // this->applyAbsorptionBC();
         if (k % frameRate == 0){
             string fileName = this->outputFolder + "output_data_" + to_string(rank) + "_" + to_string(k/frameRate) + ".vti";
-            saveVTI(u_current, fileName, "Amplitude");
+            // saveVTI(u_current, fileName, "Amplitude");
+            writeVTI(u_current, fileName, "Amplitude");
+            
         }
         VecSwap(this->u_current, this->u_next);
     }
     auto final = chrono::high_resolution_clock::now();
-    PetscFinalize();
     printf("File saved\n");
     chrono::duration<double> interval = final - start;
     printf("Elapsed time: %f seconds\n", interval.count());
@@ -128,27 +129,81 @@ void Solver2d::saveVTI(Vec grid, string outputPath, string info){
     PetscInt NxStart, NzStart, NxEnd, NzEnd;
     DMDAGetCorners(da, &NxStart, &NzStart, NULL, &NxEnd, &NzEnd, NULL);
     vtkSmartPointer<vtkImageData> imageData = vtkSmartPointer<vtkImageData>::New();
-    imageData->SetExtent(NxStart, NxStart + NxEnd - 1, NzStart, NzStart + NzEnd - 1, 0, 0);
-    imageData->SetOrigin(NxStart*dx, NzStart*dz, 0);
+    imageData->SetExtent(NxStart, NxStart + NxEnd, NzStart, NzStart + NzEnd, 0, 0);
+    imageData->SetOrigin(0, 0, 0);
     imageData->SetSpacing(dx, dz, 0);
     vtkSmartPointer<vtkFloatArray> data = vtkSmartPointer<vtkFloatArray>::New();
     data->SetNumberOfComponents(1);
-    data->SetNumberOfTuples(Nx*Nz);
+    data->SetNumberOfTuples(NxEnd*NzEnd);
     data->SetName(info.c_str());
-    PetscScalar *array;
-    VecGetArray(grid, &array);
+    PetscScalar **array;
+    DMDAVecGetArray(da, grid, &array);
+    // for (int i = NxStart; i < NxStart + NxEnd; i++){
+    //     for (int j = NzStart; j < NzStart + NzEnd; j++){
+    //         data->SetTuple1(i*this->Nx + j, array[i*this->Nx + j]);
+    //     }
+    // }
+    int jj = 0;
     for (int j = NzStart; j < NzStart + NzEnd; j++){
+        int ii = 0;
         for (int i = NxStart; i < NxStart + NxEnd; i++){
-            data->SetTuple1(i + j*Nx, array[j*Nx + i]);
+            data->SetTuple1(jj*NzEnd + ii, array[j][i]);
+            ii++;
         }
+        jj++;
     }
-    VecRestoreArray(grid, &array);
+    DMDAVecRestoreArray(da, grid, &array);
     imageData->GetPointData()->SetScalars(data);
     vtkSmartPointer<vtkXMLImageDataWriter> writer = vtkSmartPointer<vtkXMLImageDataWriter>::New();
     writer->SetDataModeToAscii();
     writer->SetFileName(outputPath.c_str());
     writer->SetInputData(imageData);
     writer->Write();
+}
+
+void Solver2d::writeVTI(Vec grid, string outputPath, string info){
+    // printf("Writing VTI file...\n");
+    PetscInt NxStart, NzStart, NxEnd, NzEnd;
+    DMDAGetCorners(this->da, &NxStart, &NzStart, NULL, &NxEnd, &NzEnd, NULL);
+    fstream file;
+    file.open(outputPath, ios::out);
+    file << "<?xml version=\"1.0\"?>\n";
+    file << "<VTKFile type=\"ImageData\" version=\"0.1\" byte_order=\"LittleEndian\">\n";
+    file << "<ImageData WholeExtent=\"" << NxStart << " " << NxStart + NxEnd - 1 << " " << NzStart << " " << NzStart + NzEnd - 1 << " 0 0\" Origin=\"0 0 0\" Spacing=\"" << dx << " " << dz << " 0\">\n";
+    file << "<Piece Extent=\"" << NxStart << " " << NxStart + NxEnd - 1 << " " << NzStart << " " << NzStart + NzEnd - 1 << " 0 0\">\n";
+    file << "<PointData Scalars=\"" << info << "\">\n";
+    file << "<DataArray type=\"Float32\" Name=\"" << info << "\" format=\"ascii\">\n";
+    PetscScalar **array;
+    DMDAVecGetArray(da, grid, &array);
+    for (int j = NzStart; j < NzStart + NzEnd; j++){
+        for (int i = NxStart; i < NxStart + NxEnd; i++){
+            file << array[j][i] << " ";
+        }
+        file << "\n";
+    }
+    DMDAVecRestoreArray(da, grid, &array);
+    file << "</DataArray>\n";
+    file << "</PointData>\n";
+    file << "</Piece>\n";
+    file << "</ImageData>\n";
+    file << "</VTKFile>\n";
+    file.close();
+    // printf("File saved\n");
+
+    // if (rank == 0){
+    //     // write pvti file
+    //     string pvtiPath = outputPath.substr(0, outputPath.size() - 4) + ".pvti";
+    //     fstream pvtiFile;
+    //     pvtiFile.open(pvtiPath, ios::out);
+    //     pvtiFile << "<?xml version=\"1.0\"?>\n";
+    //     pvtiFile << "<VTKFile type=\"PImageData\" version=\"0.1\" byte_order=\"LittleEndian\">\n";
+    //     pvtiFile << "<PImageData WholeExtent=\"" << NxStart << " " << NxStart + NxEnd - 1 << " " << NzStart << " " << NzStart + NzEnd - 1 << " 0 0\" Origin=\"0 0 0\" Spacing=\"" << dx << " " << dz << " 0\">\n";
+    //     pvtiFile << "<PPointData Scalars=\"" << info << "\">\n";
+    //     pvtiFile << "<PDataArray type=\"Float32\" Name=\"" << info << "\" format=\"ascii\"/>\n";
+    //     pvtiFile << "</PPointData>\n";
+    //     pvtiFile << "<Piece Extent=\"" << NxStart << " " << NxStart + NxEnd - 1 << " " << NzStart << " " << NzStart + NzEnd - 1 << " 0 0\" Source=\"" << outputPath << "\"/>\n";
+    //     pvtiFile << "</PImageData>\n";
+    // }
 }
 
 void Solver2d::saveVTIbin(Vec grid, string outputPath, string info){
@@ -218,9 +273,9 @@ void Solver2d::computeNext(int k){
     }
     for (int j = NzStart; j < NzEnd; j++){
         for (int i = NxStart; i < NxEnd; i++){
-            courantNumber = dt*velArray[j][i]/dx;
+            courantNumber = dt*1500/dx;
             const1 = (powf(courantNumber, 2.0f)/12.0f);
-            const2 = powf(velArray[j][i]*dt, 2.0f);
+            const2 = powf(1500*dt, 2.0f);
             val = 
             const1 *
             (
