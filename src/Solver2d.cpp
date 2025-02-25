@@ -13,10 +13,8 @@ Solver2d::Solver2d(string input_file, string output_folder, int number_of_steps,
     this->Z = this->Nz * this->dz;
     this->T = this->Nt * this->dt;
     this->frameRate = this->Nt/number_of_frames;
-    // this->xs = int(this->X/2);
-    // this->zs = int(this->Z/2);
-    this-> xs = 500;
-    this-> zs = 500;
+    this->xs = int(this->X/2);
+    this->zs = int(this->Z/2);
     DMCreateGlobalVector(this->da, &this->u_current);
     DMCreateLocalVector(this->da, &this->u_current_local);
     DMCreateGlobalVector(this->da, &this->u_next);
@@ -39,14 +37,15 @@ void Solver2d::solve(){
         printf("Saving velocity field...\n");
     }
     // saveVTI(this->vel, this->outputFolder + "velocity_field.vti", "Velocity");
+    writeVTI(this->vel, this->outputFolder + "velocity_field_" + to_string(rank) + ".vti", "Velocity");
     if (rank == 0) {
         printf("Solving...\n");
     }
     auto start = chrono::high_resolution_clock::now();
     for (int k = 0; k <= Nt; k += 1){
         this->computeNext(k);
-        // this->applyReynoldsBC(u_current, u_next);
-        // this->applyAbsorptionBC();
+        this->applyReynoldsBC(u_current, u_next);
+        this->applyAbsorptionBC();
         // this->computeNextInverted(k + 1);
         // this->applyReynoldsBC(u_next, u_current);
         // this->applyAbsorptionBC();
@@ -110,10 +109,10 @@ void Solver2d::readInputVtkImageData(string input_file){
         PetscInt *indexArray;
         indexArray = new PetscInt[Nx*Nz];
         int k = 0;
-        for (int i = NxStart; i < NxStart + NxEnd; i++){
-            for (int j = NzStart; j < NzStart + NzEnd; j++){
-                indexArray[k] = i*this->Nx + j;
-                velArray[k] = (PetscScalar)data->GetTuple1(i*this->Nx + j);
+        for (int j = 0; j < Nz; j++){
+            for (int i = 0; i < Nx; i++){
+                indexArray[k] = j*this->Nz + i;
+                velArray[k] = (PetscScalar)data->GetTuple1(j*this->Nz + i);
                 k++;
             }
         }
@@ -188,22 +187,29 @@ void Solver2d::writeVTI(Vec grid, string outputPath, string info){
     file << "</ImageData>\n";
     file << "</VTKFile>\n";
     file.close();
-    // printf("File saved\n");
+}
 
-    // if (rank == 0){
-    //     // write pvti file
-    //     string pvtiPath = outputPath.substr(0, outputPath.size() - 4) + ".pvti";
-    //     fstream pvtiFile;
-    //     pvtiFile.open(pvtiPath, ios::out);
-    //     pvtiFile << "<?xml version=\"1.0\"?>\n";
-    //     pvtiFile << "<VTKFile type=\"PImageData\" version=\"0.1\" byte_order=\"LittleEndian\">\n";
-    //     pvtiFile << "<PImageData WholeExtent=\"" << NxStart << " " << NxStart + NxEnd - 1 << " " << NzStart << " " << NzStart + NzEnd - 1 << " 0 0\" Origin=\"0 0 0\" Spacing=\"" << dx << " " << dz << " 0\">\n";
-    //     pvtiFile << "<PPointData Scalars=\"" << info << "\">\n";
-    //     pvtiFile << "<PDataArray type=\"Float32\" Name=\"" << info << "\" format=\"ascii\"/>\n";
-    //     pvtiFile << "</PPointData>\n";
-    //     pvtiFile << "<Piece Extent=\"" << NxStart << " " << NxStart + NxEnd - 1 << " " << NzStart << " " << NzStart + NzEnd - 1 << " 0 0\" Source=\"" << outputPath << "\"/>\n";
-    //     pvtiFile << "</PImageData>\n";
-    // }
+void Solver2d::writePVTI(string outputPath, string info){
+    int rank;
+    MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
+    PetscInt NxStart, NzStart, NxEnd, NzEnd;
+    DMDAGetCorners(this->da, &NxStart, &NzStart, NULL, &NxEnd, &NzEnd, NULL);
+    if (rank == 0){
+        // write pvti file
+        string pvtiPath = outputPath.substr(0, outputPath.size() - 4) + ".pvti";
+        fstream pvtiFile;
+        pvtiFile.open(pvtiPath, ios::out);
+        pvtiFile << "<?xml version=\"1.0\"?>\n";
+        pvtiFile << "<VTKFile type=\"PImageData\" version=\"0.1\" byte_order=\"LittleEndian\">\n";
+        pvtiFile << "<PImageData WholeExtent=\"" << NxStart << " " << NxStart + NxEnd - 1 << " " << NzStart << " " << NzStart + NzEnd - 1 << " 0 0\" Origin=\"0 0 0\" Spacing=\"" << dx << " " << dz << " 0\">\n";
+        pvtiFile << "<PPointData Scalars=\"" << info << "\">\n";
+        pvtiFile << "<PDataArray type=\"Float32\" Name=\"" << info << "\" format=\"ascii\"/>\n";
+        pvtiFile << "</PPointData>\n";
+        pvtiFile << "<Piece Extent=\"" << NxStart << " " << NxStart + NxEnd - 1 << " " << NzStart << " " << NzStart + NzEnd - 1 << " 0 0\" Source=\"" << outputPath << "\"/>\n";
+        pvtiFile << "</PImageData>\n";
+        pvtiFile << "</VTKFile>\n";
+        pvtiFile.close();
+    }
 }
 
 void Solver2d::saveVTIbin(Vec grid, string outputPath, string info){
@@ -273,9 +279,9 @@ void Solver2d::computeNext(int k){
     }
     for (int j = NzStart; j < NzEnd; j++){
         for (int i = NxStart; i < NxEnd; i++){
-            courantNumber = dt*1500/dx;
+            courantNumber = dt*velArray[j][i]/dx;
             const1 = (powf(courantNumber, 2.0f)/12.0f);
-            const2 = powf(1500*dt, 2.0f);
+            const2 = powf(velArray[j][i]*dt, 2.0f);
             val = 
             const1 *
             (
@@ -356,46 +362,79 @@ void Solver2d::computeNextInverted(int k){
 }
 
 void Solver2d::applyReynoldsBC(Vec u_current, Vec u_next){
+    DMGlobalToLocalBegin(da,this->u_current,INSERT_VALUES,this->u_current_local);
+    DMGlobalToLocalEnd(da,this->u_current,INSERT_VALUES,this->u_current_local);
+    DMGlobalToLocalBegin(da,this->u_next,INSERT_VALUES,this->u_next_local);
+    DMGlobalToLocalEnd(da,this->u_next,INSERT_VALUES,this->u_next_local);
+
     PetscScalar **u_currentArray, **u_nextArray, **velArray;
-    DMDAVecGetArray(this->da, u_current, &u_currentArray);
-    DMDAVecGetArray(this->da, u_next, &u_nextArray);
-    DMDAVecGetArray(this->da, this->vel, &velArray);
-    PetscInt NzStart, NxStart, Nz, Nx;
-    DMDAGetCorners(this->da, &NxStart, &NzStart, NULL, &Nx, &Nz, NULL);
-    for(int j = STENCIL; j < Nz - STENCIL; j++){
-        for(int i = STENCIL; i <= STENCIL + 1; i++){
-            // float courantNumber = dt * vel->get(j, i)/dx;
-            // (*u_next)(j, i) = (*u_current)(j, i) + courantNumber*((*u_current)(j, i + 1) - (*u_current)(j, i));
+    DMDAVecGetArray(da, u_current_local, &u_currentArray);
+    DMDAVecGetArray(da, u_next_local, &u_nextArray);
+    DMDAVecGetArray(da, vel_local, &velArray);
+    PetscInt NzStart, NxStart, NzEnd, NxEnd;
+    DMDAGetCorners(da, &NxStart, &NzStart, NULL, &NxEnd, &NzEnd, NULL);
+    bool bc[4];
+    NzEnd = NzStart + NzEnd;
+    NxEnd = NxStart + NxEnd;
+    bc[0] = NxStart == 0;      // left
+    bc[1] = NzStart == 0;      // bottom
+    bc[2] = NxEnd == this->Nx; // right
+    bc[3] = NzEnd == this->Nz; // top
+    if (NzStart < STENCIL){
+        NzStart = STENCIL;
+    }
+    if (NxStart < STENCIL){
+        NxStart = STENCIL;
+    }
+    if (NzEnd > this->Nz - STENCIL){
+        NzEnd = NzEnd - STENCIL;
+    }
+    if (NxEnd > this->Nx - STENCIL){
+        NxEnd = NxEnd - STENCIL;
+    }
+    if (bc[0]){
+        for (int j = NzStart; j < NzEnd; j++){
+            // float courantNumber = dt * vel->get(j, STENCIL)/dx;
+            // (*u_next)(j, STENCIL - 1) = (*u_current)(j, STENCIL - 1) - courantNumber*((*u_current)(j, STENCIL) - (*u_current)(j, STENCIL - 1));
+            int i = STENCIL + 1;
             float courantNumber = dt * velArray[j][i]/dx;
             u_nextArray[j][i] = u_currentArray[j][i] + courantNumber*(u_currentArray[j][i + 1] - u_currentArray[j][i]);
         }
     }
-    for(int j = STENCIL; j < Nz - STENCIL; j++){
-        for(int i = Nx - STENCIL - 1; i <= Nx - STENCIL; i++){
-            // float courantNumber = dt * vel->get(j, i)/dx;
-            // (*u_next)(j, i) = (*u_current)(j, i) - courantNumber*((*u_current)(j, i) - (*u_current)(j, i - 1));
-            float courantNumber = dt * velArray[j][i]/dx;
-            u_nextArray[j][i] = u_currentArray[j][i] - courantNumber*(u_currentArray[j][i] - u_currentArray[j][i - 1]);
-        }
-    }
-    for(int i = STENCIL; i < Nx - STENCIL; i++){
-        for(int j = STENCIL; j <= STENCIL + 1; j++){
-            // float courantNumber = dt * vel->get(j, i)/dx;
-            // (*u_next)(j, i) = (*u_current)(j, i) + courantNumber*((*u_current)(j + 1, i) - (*u_current)(j, i));
+    if (bc[1]){
+        for (int i = NxStart; i < NxEnd; i++){
+            // float courantNumber = dt * vel->get(STENCIL, i)/dx;
+            // (*u_next)(STENCIL - 1, i) = (*u_current)(STENCIL - 1, i) - courantNumber*((*u_current)(STENCIL, i) - (*u_current)(STENCIL - 1, i));
+            int j = STENCIL + 1;
             float courantNumber = dt * velArray[j][i]/dx;
             u_nextArray[j][i] = u_currentArray[j][i] + courantNumber*(u_currentArray[j + 1][i] - u_currentArray[j][i]);
         }
     }
-    for(int i = STENCIL; i < Nx - STENCIL; i++){
-        for(int j = Nz - STENCIL - 1; j <= Nz - STENCIL; j++){
-            // float courantNumber = dt * vel->get(j, i)/dx;
-            // (*u_next)(j, i) = (*u_current)(j, i) - courantNumber*((*u_current)(j, i) - (*u_current)(j - 1, i));
+    if (bc[2]){
+        for (int j = NzStart; j < NzEnd; j++){
+            // float courantNumber = dt * vel->get(j, Nx - STENCIL - 1)/dx;
+            // (*u_next)(j, Nx - STENCIL) = (*u_current)(j, Nx - STENCIL) - courantNumber*((*u_current)(j, Nx - STENCIL) - (*u_current)(j, Nx - STENCIL - 1));
+            int i = Nx - STENCIL - 2;
+            float courantNumber = dt * velArray[j][i]/dx;
+            u_nextArray[j][i] = u_currentArray[j][i] - courantNumber*(u_currentArray[j][i] - u_currentArray[j][i - 1]);
+        }
+    }
+    if (bc[3]){
+        for (int i = NxStart; i < NxEnd; i++){
+            // float courantNumber = dt * vel->get(Nz - STENCIL - 1, i)/dx;
+            // (*u_next)(Nz - STENCIL, i) = (*u_current)(Nz - STENCIL, i) - courantNumber*((*u_current)(Nz - STENCIL, i) - (*u_current)(Nz - STENCIL - 1, i));
+            int j = Nz - STENCIL - 2;
             float courantNumber = dt * velArray[j][i]/dx;
             u_nextArray[j][i] = u_currentArray[j][i] - courantNumber*(u_currentArray[j][i] - u_currentArray[j - 1][i]);
         }
     }
-    DMDAVecRestoreArray(this->da, u_current, &u_currentArray);
-    DMDAVecRestoreArray(this->da, u_next, &u_nextArray);
+    DMDAVecRestoreArray(da, u_current_local, &u_currentArray);
+    DMDAVecRestoreArray(da, u_next_local, &u_nextArray);
+
+    DMLocalToGlobalBegin(da,u_current_local,INSERT_VALUES,u_current);
+    DMLocalToGlobalEnd(da,u_current_local,INSERT_VALUES,u_current);
+    DMLocalToGlobalBegin(da,u_next_local,INSERT_VALUES,u_next);
+    DMLocalToGlobalEnd(da,u_next_local,INSERT_VALUES,u_next);
 }
 
 float Solver2d::mitigation(float x, int border){
@@ -405,40 +444,76 @@ float Solver2d::mitigation(float x, int border){
 
 void Solver2d::applyAbsorptionBC(){
     int border = 25;
+    
+    DMGlobalToLocalBegin(da,this->u_current,INSERT_VALUES,this->u_current_local);
+    DMGlobalToLocalEnd(da,this->u_current,INSERT_VALUES,this->u_current_local);
+    DMGlobalToLocalBegin(da,this->u_next,INSERT_VALUES,this->u_next_local);
+    DMGlobalToLocalEnd(da,this->u_next,INSERT_VALUES,this->u_next_local);
+
     PetscScalar **u_currentArray, **u_nextArray;
-    DMDAVecGetArray(this->da, this->u_current, &u_currentArray);
-    DMDAVecGetArray(this->da, this->u_next, &u_nextArray);
-    for(int j = STENCIL; j < border; j++){
-        for(int i = STENCIL; i <= Nx - STENCIL; i++){
-            // u_current->set(j, i, u_current->get(j, i)*mitigation(j, border));
-            // u_next->set(j, i, u_next->get(j, i)*mitigation(j, border));
-            u_currentArray[j][i] = u_currentArray[j][i]*mitigation(j, border);
-            u_nextArray[j][i] = u_nextArray[j][i]*mitigation(j, border);
+    DMDAVecGetArray(da, u_current_local, &u_currentArray);
+    DMDAVecGetArray(da, u_next_local, &u_nextArray);
+
+    PetscInt NzStart, NxStart, NzEnd, NxEnd;
+    DMDAGetCorners(da, &NxStart, &NzStart, NULL, &NxEnd, &NzEnd, NULL);
+    bool bc[4];
+    NzEnd = NzStart + NzEnd;
+    NxEnd = NxStart + NxEnd;
+    bc[0] = NxStart == 0;      // left
+    bc[1] = NzStart == 0;      // bottom
+    bc[2] = NxEnd == this->Nx; // right
+    bc[3] = NzEnd == this->Nz; // top
+    if (NzStart < STENCIL){
+        NzStart = STENCIL;
+    }
+    if (NxStart < STENCIL){
+        NxStart = STENCIL;
+    }
+    if (NzEnd > this->Nz - STENCIL){
+        NzEnd = NzEnd - STENCIL;
+    }
+    if (NxEnd > this->Nx - STENCIL){
+        NxEnd = NxEnd - STENCIL;
+    }
+
+    if (bc[0]){
+        for (int j = NzStart; j < NzEnd; j++){
+            for (int i = NxStart; i <= border; i++){
+                u_currentArray[j][i] = u_currentArray[j][i]*mitigation(i, border);
+                u_nextArray[j][i] = u_nextArray[j][i]*mitigation(i, border);
+            }
         }
     }
-    for(int j = Nz - border; j <= Nz - STENCIL; j++){
-        for(int i = STENCIL; i <= Nx - STENCIL; i++){
-            // u_current->set(j, i, u_current->get(j, i)*mitigation(Nz - j, border));
-            // u_next->set(j, i, u_next->get(j, i)*mitigation(Nz - j, border));
-            u_currentArray[j][i] = u_currentArray[j][i]*mitigation(Nz - j, border);
-            u_nextArray[j][i] = u_nextArray[j][i]*mitigation(Nz - j, border);
+    if (bc[1]){
+        for (int i = NxStart; i < NxEnd; i++){
+            for (int j = NzStart; j <= border; j++){
+                u_currentArray[j][i] = u_currentArray[j][i]*mitigation(j, border);
+                u_nextArray[j][i] = u_nextArray[j][i]*mitigation(j, border);
+            }
         }
     }
-    for(int j = border; j < Nz - border; j++){
-        for(int i = STENCIL; i <= border; i++){
-            // u_current->set(j,i, u_current->get(j, i)*mitigation(i, border));
-            // u_next->set(j,i, u_next->get(j, i)*mitigation(i, border));
-            u_currentArray[j][i] = u_currentArray[j][i]*mitigation(i, border);
-            u_nextArray[j][i] = u_nextArray[j][i]*mitigation(i, border);
+    if (bc[2]){
+        for (int j = NzStart; j < NzEnd; j++){
+            for (int i = NxEnd - border; i < NxEnd; i++){
+                u_currentArray[j][i] = u_currentArray[j][i]*mitigation(Nx - i, border);
+                u_nextArray[j][i] = u_nextArray[j][i]*mitigation(Nx - i, border);
+            }
         }
     }
-    for(int j = border; j < Nz - border; j++){
-        for(int i = Nx - border; i <= Nx - STENCIL; i++){
-            // u_current->set(j,i, u_current->get(j, i)*mitigation((Nx - i), border));
-            // u_next->set(j,i, u_next->get(j, i)*mitigation((Nx - i), border));
-            u_currentArray[j][i] = u_currentArray[j][i]*mitigation((Nx - i), border);
-            u_nextArray[j][i] = u_nextArray[j][i]*mitigation((Nx - i), border);
+    if (bc[3]){
+        for (int i = NxStart; i < NxEnd; i++){
+            for (int j = NzEnd - border; j < NzEnd; j++){
+                u_currentArray[j][i] = u_currentArray[j][i]*mitigation(Nz - j, border);
+                u_nextArray[j][i] = u_nextArray[j][i]*mitigation(Nz - j, border);
+            }
         }
     }
+    DMDAVecRestoreArray(da, u_current_local, &u_currentArray);
+    DMDAVecRestoreArray(da, u_next_local, &u_nextArray);
+
+    DMLocalToGlobalBegin(da,u_current_local,INSERT_VALUES,u_current);
+    DMLocalToGlobalEnd(da,u_current_local,INSERT_VALUES,u_current);
+    DMLocalToGlobalBegin(da,u_next_local,INSERT_VALUES,u_next);
+    DMLocalToGlobalEnd(da,u_next_local,INSERT_VALUES,u_next);
 }
 

@@ -28,6 +28,7 @@ class Solver2d{
         void printParameters();
         void saveVTI(Vec u, string outputPath, string info);
         void writeVTI(Vec u, string outputPath, string info);
+        void writePVTI(string outputPath, string info);
         void saveVTIbin(Vec u, string outputPath, string info);
         void savePVTI(Vec u, string outputPath, string info);
         void solve();
