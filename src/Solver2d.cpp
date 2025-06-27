@@ -53,7 +53,7 @@ void Solver2d::solve(){
             string fileName = this->outputFolder + "output_data_" + to_string(rank) + "_" + to_string(k/frameRate) + ".vti";
             // saveVTI(u_current, fileName, "Amplitude");
             writeVTI(u_current, fileName, "Amplitude");
-            
+
         }
         VecSwap(this->u_current, this->u_next);
     }
@@ -66,7 +66,7 @@ void Solver2d::solve(){
 void Solver2d::printParameters(){
     printf("\nSimulation paremeters:\n");
     cout << "X = " << this->X << "m\n";
-    cout << "Z = " << this->Z << "m\n"; 
+    cout << "Z = " << this->Z << "m\n";
     cout << "T = " << this->T << "s\n";
     cout << "dx = " << this->dx << "m\n";
     cout << "dt = " << this->dt << "s\n";
@@ -241,8 +241,8 @@ float Solver2d::source(int x, int z, float k){
     float fcorte = 40;
     if (x != (int)(this->xs/this->dx) || z!= (int)(this->zs/this->dz) || k*this->dt > 0.5){
         return 0;
-    } 
-    float td = k*this->dt - ((2.0f*sqrtf(M_PI))/fcorte);  
+    }
+    float td = k*this->dt - ((2.0f*sqrtf(M_PI))/fcorte);
     float fc = (fcorte/(3.0f*sqrtf(M_PI)));
     return (1.0f - 2.0f * M_PI * powf(M_PI * fc * td, 2.0f))/powf(M_E, M_PI*powf((M_PI*fc*td), 2.0f));
 }
@@ -282,15 +282,15 @@ void Solver2d::computeNext(int k){
             courantNumber = dt*velArray[j][i]/dx;
             const1 = (powf(courantNumber, 2.0f)/12.0f);
             const2 = powf(velArray[j][i]*dt, 2.0f);
-            val = 
+            val =
             const1 *
             (
-                -1*(u_currentArray[j][i - 2] + u_currentArray[j - 2][i]) + 
-                16*(u_currentArray[j][i - 1] + u_currentArray[j - 1][i]) - 
+                -1*(u_currentArray[j][i - 2] + u_currentArray[j - 2][i]) +
+                16*(u_currentArray[j][i - 1] + u_currentArray[j - 1][i]) -
                 60* u_currentArray[j][i] +
                 16*(u_currentArray[j][i + 1] + u_currentArray[j + 1][i]) -
-                   (u_currentArray[j][i + 2] + u_currentArray[j + 2][i]) 
-            ) 
+                   (u_currentArray[j][i + 2] + u_currentArray[j + 2][i])
+            )
             + 2*u_currentArray[j][i] - u_nextArray[j][i] - const2 * this->source(i, j, k);
             u_nextArray[j][i] = val;
         }
@@ -339,15 +339,15 @@ void Solver2d::computeNextInverted(int k){
             courantNumber = dt*velArray[j][i]/dx;
             const1 = (powf(courantNumber, 2.0f)/12.0f);
             const2 = powf(velArray[j][i]*dt, 2.0f);
-            val = 
+            val =
             const1 *
             (
-                -1*(u_currentArray[j][i - 2] + u_currentArray[j - 2][i]) + 
-                16*(u_currentArray[j][i - 1] + u_currentArray[j - 1][i]) - 
+                -1*(u_currentArray[j][i - 2] + u_currentArray[j - 2][i]) +
+                16*(u_currentArray[j][i - 1] + u_currentArray[j - 1][i]) -
                 60* u_currentArray[j][i] +
                 16*(u_currentArray[j][i + 1] + u_currentArray[j + 1][i]) -
-                   (u_currentArray[j][i + 2] + u_currentArray[j + 2][i]) 
-            ) 
+                   (u_currentArray[j][i + 2] + u_currentArray[j + 2][i])
+            )
             + 2*u_currentArray[j][i] - u_nextArray[j][i] - const2 * this->source(i, j, k);
             u_nextArray[j][i] = val;
         }
@@ -444,7 +444,7 @@ float Solver2d::mitigation(float x, int border){
 
 void Solver2d::applyAbsorptionBC(){
     int border = 25;
-    
+
     DMGlobalToLocalBegin(da,this->u_current,INSERT_VALUES,this->u_current_local);
     DMGlobalToLocalEnd(da,this->u_current,INSERT_VALUES,this->u_current_local);
     DMGlobalToLocalBegin(da,this->u_next,INSERT_VALUES,this->u_next_local);
@@ -516,4 +516,3 @@ void Solver2d::applyAbsorptionBC(){
     DMLocalToGlobalBegin(da,u_next_local,INSERT_VALUES,u_next);
     DMLocalToGlobalEnd(da,u_next_local,INSERT_VALUES,u_next);
 }
-
