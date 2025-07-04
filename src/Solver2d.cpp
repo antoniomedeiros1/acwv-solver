@@ -2,43 +2,60 @@
 
 
 Solver2d::Solver2d(string input_file, string output_folder, int number_of_steps, float dt, int number_of_frames){
-    printf("Reading input file: %s\n", input_file.c_str());
+    int nprocs;
+    MPI_Comm_size(PETSC_COMM_WORLD, &nprocs);
     this->outputFolder = output_folder;
-    this->d = Domain();
-    this->d.dt = dt;
-    this->d.Nt = number_of_steps;
+    printf("Reading input file: %s\n", input_file.c_str());
     this->readInputVtkImageData(input_file);
-    this->d.X = this->d.Nx * this->d.dx;
-    this->d.Z = this->d.Nz * this->d.dz;
-    this->d.T = this->d.Nt * this->d.dt;
-    this->frameRate = this->d.Nt/number_of_frames;
-    this->d.fcorte = 40;
-    this->d.xs = int(this->d.X/2);
-    this->d.zs = int(this->d.Z/2);
-    this->u_current = new Grid2d(this->d.Nz, this->d.Nx);
-    this->u_next    = new Grid2d(this->d.Nz, this->d.Nx);
-    this->f         = new Grid2d(this->d.Nz, this->d.Nx);
+    this->dt = dt;
+    this->Nt = number_of_steps;
+    this->X = this->Nx * this->dx;
+    this->Z = this->Nz * this->dz;
+    this->T = this->Nt * this->dt;
+    this->frameRate = this->Nt/number_of_frames;
+    this->xs = int(this->X/2);
+    this->zs = int(this->Z/2);
+    DMCreateGlobalVector(this->da, &this->u_current);
+    DMCreateLocalVector(this->da, &this->u_current_local);
+    DMCreateGlobalVector(this->da, &this->u_next);
+    DMCreateLocalVector(this->da, &this->u_next_local);
+    VecSet(this->u_current, 0.0);
+    VecAssemblyBegin(this->u_current);
+    VecAssemblyEnd(this->u_current);
+    VecSet(this->u_next, 0.0);
+    VecAssemblyBegin(this->u_next);
+    VecAssemblyEnd(this->u_next);
 }
 
 Solver2d::~Solver2d(){}
 
 void Solver2d::solve(){
-    printParameters();
-    printf("Saving velocity field...\n");
-    saveVTI(this->d, this->d.vel, this->outputFolder + "velocity_field", "Velocity");
-    printf("Solving...\n");
+    int rank;
+    MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
+    if (rank == 0) {
+        printParameters();
+        printf("Saving velocity field...\n");
+    }
+    // saveVTI(this->vel, this->outputFolder + "velocity_field.vti", "Velocity");
+    writeVTI(this->vel, this->outputFolder + "velocity_field_" + to_string(rank) + ".vti", "Velocity");
+    if (rank == 0) {
+        printf("Solving...\n");
+    }
     auto start = chrono::high_resolution_clock::now();
-    for (int k = 0; k <= d.Nt; k += 2){
-        this->computeNext(d, u_current, u_next, k);
+    for (int k = 0; k <= Nt; k += 1){
+        this->computeNext(k);
         this->applyReynoldsBC(u_current, u_next);
         this->applyAbsorptionBC();
-        this->computeNext(d, u_next, u_current, k + 1);
-        this->applyReynoldsBC(u_next, u_current);
-        this->applyAbsorptionBC();
+        // this->computeNextInverted(k + 1);
+        // this->applyReynoldsBC(u_next, u_current);
+        // this->applyAbsorptionBC();
         if (k % frameRate == 0){
-            string fileName = this->outputFolder + "output_data" + to_string(k/frameRate);
-            saveVTI(d, u_current, fileName, "Amplitude");
+            string fileName = this->outputFolder + "output_data_" + to_string(rank) + "_" + to_string(k/frameRate) + ".vti";
+            // saveVTI(u_current, fileName, "Amplitude");
+            writeVTI(u_current, fileName, "Amplitude");
+
         }
+        VecSwap(this->u_current, this->u_next);
     }
     auto final = chrono::high_resolution_clock::now();
     printf("File saved\n");
@@ -48,209 +65,454 @@ void Solver2d::solve(){
 
 void Solver2d::printParameters(){
     printf("\nSimulation paremeters:\n");
-    cout << "X = " << this->d.X << "m\n";
-    cout << "Z = " << this->d.Z << "m\n"; 
-    cout << "T = " << this->d.T << "s\n";
-    cout << "dx = " << this->d.dx << "m\n";
-    cout << "dt = " << this->d.dt << "s\n";
-}
-
-void Solver2d::readInputTxt(string input_file){
-    ifstream myfile;
-    myfile.open(input_file);
-    if(myfile.is_open()){
-        myfile >> this->d.Nx; 
-        myfile >> this->d.Nz;
-        myfile >> this->d.Nt;
-        myfile >> this->d.dx;
-        this->d.dz = this->d.dx;
-        myfile >> this->d.dt;
-        this->d.vel = new Grid2d(this->d.Nz, this->d.Nx);
-        float v;
-        for (int i = 0; i < this->d.Nx; i++){
-            for (int j = 0; j < this->d.Nz; j++){
-                myfile >> v;
-                this->d.vel->set(j, i, v);
-            }
-        }
-        myfile.close();
-    } else {
-        printf("Failed to open file\n");
-        exit(1);
-    }
+    cout << "X = " << this->X << "m\n";
+    cout << "Z = " << this->Z << "m\n";
+    cout << "T = " << this->T << "s\n";
+    cout << "dx = " << this->dx << "m\n";
+    cout << "dt = " << this->dt << "s\n";
 }
 
 void Solver2d::readInputVtkImageData(string input_file){
-    vtkSmartPointer<vtkXMLImageDataReader> reader = vtkSmartPointer<vtkXMLImageDataReader>::New();
-    reader->SetFileName(input_file.c_str());
-    reader->Update();
-    vtkSmartPointer<vtkImageData> imageData = reader->GetOutput();
-    int* extent = imageData->GetExtent();
-    double* spacing = imageData->GetSpacing();
-    this->d.Nx = extent[1] - extent[0] + 1;
-    this->d.Nz = extent[3] - extent[2] + 1;
-    this->d.dx = spacing[0];
-    this->d.dz = spacing[1];
-    vtkSmartPointer<vtkDataArray> data = imageData->GetPointData()->GetScalars();
-    this->d.vel = new Grid2d(this->d.Nz, this->d.Nx);
-    for (int i = 0; i < this->d.Nx; i++){
-        for (int j = 0; j < this->d.Nz; j++){
-            this->d.vel->set(j, i, data->GetTuple1(i + j*this->d.Nx));
-        }
+    int rank;
+    MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
+    printf("Rank: %d\n", rank);
+    int* extent = new int[6];
+    double* spacing = new double[3];
+    vtkSmartPointer<vtkDataArray> data;
+    if (rank == 0){
+        vtkSmartPointer<vtkXMLImageDataReader> reader = vtkSmartPointer<vtkXMLImageDataReader>::New();
+        reader->SetFileName(input_file.c_str());
+        reader->Update();
+        vtkSmartPointer<vtkImageData> imageData = reader->GetOutput();
+        extent = imageData->GetExtent();
+        spacing = imageData->GetSpacing();
+        data = imageData->GetPointData()->GetScalars();
     }
-}
-
-void Solver2d::saveVTI(Domain d, Grid2d* grid, string outputPath, string info){
-    ofstream myfile;
-    myfile.open(outputPath + ".vti");
-    if(myfile.is_open()){
-        myfile << "<VTKFile type=\"ImageData\" version=\"0.1\" byte_order=\"LittleEndian\">\n";
-        myfile << "  <ImageData WholeExtent= \"" <<  STENCIL << " " << d.Nx - 1 - STENCIL << " " << STENCIL << " " << d.Nz - 1 - STENCIL << " " << 0 << " " << 0 << "\" ";
-        myfile << "Origin = \"" << STENCIL << " " << d.Nz - 1 << " " << 0 << "\" ";
-        myfile << "Spacing = \"" << d.dx << " " << d.dz << " " << 0 << "\">\n";
-        myfile << "    <Piece Extent = \"" << STENCIL << " " << d.Nx - 1 - STENCIL << " " << STENCIL << " " << d.Nz - 1 - STENCIL << " " << 0 << " " << 0 << "\">\n";
-        myfile << "      <PointData Scalars=\"" + info + "\">\n";
-        myfile << "        <DataArray type=\"Float32\" Name=\"" + info + "\" format=\"ascii\">\n";
-        for (int j = STENCIL; j < d.Nz - STENCIL; j++){
-            for (int i = STENCIL; i < d.Nx - STENCIL; i++){
-                myfile << grid->get(j, i) << " ";
+    MPI_Bcast(extent, 6, MPI_INT, 0, PETSC_COMM_WORLD);
+    MPI_Bcast(spacing, 3, MPI_DOUBLE, 0, PETSC_COMM_WORLD);
+    this->Nx = extent[1] - extent[0] + 1;
+    this->Nz = extent[3] - extent[2] + 1;
+    this->dx = spacing[0];
+    this->dz = spacing[1];
+    DMDACreate2d(PETSC_COMM_WORLD, DM_BOUNDARY_NONE, DM_BOUNDARY_NONE, DMDA_STENCIL_STAR, this->Nx, this->Nz, PETSC_DECIDE, PETSC_DECIDE, 1, 1, NULL, NULL, &this->da);
+    DMDASetStencilWidth(this->da, STENCIL);
+    DMSetFromOptions(this->da);
+    DMSetUp(this->da);
+    DMCreateGlobalVector(this->da, &this->vel);
+    DMCreateLocalVector(this->da, &this->vel_local);
+    int NxStart, NzStart, NxEnd, NzEnd;
+    DMDAGetCorners(this->da, &NxStart, &NzStart, NULL, &NxEnd, &NzEnd, NULL);
+    // VecGetArray(this->vel_local, &velArray);
+    if (rank == 0){
+        PetscScalar *velArray;
+        velArray = new PetscScalar[Nx*Nz];
+        PetscInt *indexArray;
+        indexArray = new PetscInt[Nx*Nz];
+        int k = 0;
+        for (int j = 0; j < Nz; j++){
+            for (int i = 0; i < Nx; i++){
+                indexArray[k] = j*this->Nz + i;
+                velArray[k] = (PetscScalar)data->GetTuple1(j*this->Nz + i);
+                k++;
             }
         }
-        myfile << "\n        </DataArray>";
-        myfile << "\n      </PointData>";
-        myfile << "\n    </Piece>";
-        myfile << "\n  </ImageData>";
-        myfile << "\n</VTKFile>";
-    } else {
-        cout << "Failed to create " << outputPath << ".vti" << endl;
+        VecSetValues(this->vel, this->Nz*this->Nx, indexArray, velArray, INSERT_VALUES);
     }
+    VecAssemblyBegin(this->vel);
+    VecAssemblyEnd(this->vel);
+    DMGlobalToLocalBegin(this->da, this->vel, INSERT_VALUES, this->vel_local);
+    DMGlobalToLocalEnd(this->da, this->vel, INSERT_VALUES, this->vel_local);
 }
 
-void Solver2d::saveVTIbin(Domain d, Grid2d* grid, string outputPath, string info){
-    ofstream myfile;
-    myfile.open(outputPath + ".vti", ios::binary);
-    if(myfile.is_open()){
-        myfile << "<VTKFile type=\"ImageData\" version=\"0.1\" byte_order=\"LittleEndian\">\n";
-        myfile << "  <ImageData WholeExtent= \"" <<  STENCIL << " " << d.Nx - 1 - STENCIL << " " << STENCIL << " " << d.Nz - 1 - STENCIL << " " << 0 << " " << 0 << "\" ";
-        myfile << "Origin = \"" << STENCIL << " " << d.Nz - 1 << " " << 0 << "\" ";
-        myfile << "Spacing = \"" << d.dx << " " << d.dz << " " << 0 << "\">\n";
-        myfile << "    <Piece Extent = \"" << STENCIL << " " << d.Nx - 1 - STENCIL << " " << STENCIL << " " << d.Nz - 1 - STENCIL << " " << 0 << " " << 0 << "\">\n";
-        myfile << "      <PointData Scalars=\"" + info + "\">\n";
-        myfile << "        <DataArray type=\"Float32\" Name=\"" + info + "\" format=\"binary\">\n";
-        myfile.write((char *) grid->firstptr(), grid->getSize() * sizeof(float));
-        myfile << "\n        </DataArray>";
-        myfile << "\n      </PointData>";
-        myfile << "\n    </Piece>";
-        myfile << "\n  </ImageData>";
-        myfile << "\n</VTKFile>";
-    } else {
-        cout << "Erro na gravação do arquivo " << outputPath << ".vti" << endl;
-    }
-}
-
-void salvaGNUPlot(Domain d, int k, int modk, string base, Grid2d* u){
-    ofstream myfile;
-    cout << "Gerando arquivo data" << to_string(k/modk) + base << "..." << endl;
-    myfile.open("../data" + to_string(k/modk) + base);
-        for (int j = STENCIL; j < d.Nz - STENCIL; j++){
-            for (int i = STENCIL; i < d.Nx - STENCIL; i++){
-                myfile << j*d.dz << " " << i*d.dx << " " << u->get(j, i) << "\n";
-            }
-            myfile << "\n\n";
+void Solver2d::saveVTI(Vec grid, string outputPath, string info){
+    PetscInt NxStart, NzStart, NxEnd, NzEnd;
+    DMDAGetCorners(da, &NxStart, &NzStart, NULL, &NxEnd, &NzEnd, NULL);
+    vtkSmartPointer<vtkImageData> imageData = vtkSmartPointer<vtkImageData>::New();
+    imageData->SetExtent(NxStart, NxStart + NxEnd, NzStart, NzStart + NzEnd, 0, 0);
+    imageData->SetOrigin(0, 0, 0);
+    imageData->SetSpacing(dx, dz, 0);
+    vtkSmartPointer<vtkFloatArray> data = vtkSmartPointer<vtkFloatArray>::New();
+    data->SetNumberOfComponents(1);
+    data->SetNumberOfTuples(NxEnd*NzEnd);
+    data->SetName(info.c_str());
+    PetscScalar **array;
+    DMDAVecGetArray(da, grid, &array);
+    // for (int i = NxStart; i < NxStart + NxEnd; i++){
+    //     for (int j = NzStart; j < NzStart + NzEnd; j++){
+    //         data->SetTuple1(i*this->Nx + j, array[i*this->Nx + j]);
+    //     }
+    // }
+    int jj = 0;
+    for (int j = NzStart; j < NzStart + NzEnd; j++){
+        int ii = 0;
+        for (int i = NxStart; i < NxStart + NxEnd; i++){
+            data->SetTuple1(jj*NzEnd + ii, array[j][i]);
+            ii++;
         }
-    myfile.close();
+        jj++;
+    }
+    DMDAVecRestoreArray(da, grid, &array);
+    imageData->GetPointData()->SetScalars(data);
+    vtkSmartPointer<vtkXMLImageDataWriter> writer = vtkSmartPointer<vtkXMLImageDataWriter>::New();
+    writer->SetDataModeToAscii();
+    writer->SetFileName(outputPath.c_str());
+    writer->SetInputData(imageData);
+    writer->Write();
+}
+
+void Solver2d::writeVTI(Vec grid, string outputPath, string info){
+    // printf("Writing VTI file...\n");
+    PetscInt NxStart, NzStart, NxEnd, NzEnd;
+    DMDAGetCorners(this->da, &NxStart, &NzStart, NULL, &NxEnd, &NzEnd, NULL);
+    fstream file;
+    file.open(outputPath, ios::out);
+    file << "<?xml version=\"1.0\"?>\n";
+    file << "<VTKFile type=\"ImageData\" version=\"0.1\" byte_order=\"LittleEndian\">\n";
+    file << "<ImageData WholeExtent=\"" << NxStart << " " << NxStart + NxEnd - 1 << " " << NzStart << " " << NzStart + NzEnd - 1 << " 0 0\" Origin=\"0 0 0\" Spacing=\"" << dx << " " << dz << " 0\">\n";
+    file << "<Piece Extent=\"" << NxStart << " " << NxStart + NxEnd - 1 << " " << NzStart << " " << NzStart + NzEnd - 1 << " 0 0\">\n";
+    file << "<PointData Scalars=\"" << info << "\">\n";
+    file << "<DataArray type=\"Float32\" Name=\"" << info << "\" format=\"ascii\">\n";
+    PetscScalar **array;
+    DMDAVecGetArray(da, grid, &array);
+    for (int j = NzStart; j < NzStart + NzEnd; j++){
+        for (int i = NxStart; i < NxStart + NxEnd; i++){
+            file << array[j][i] << " ";
+        }
+        file << "\n";
+    }
+    DMDAVecRestoreArray(da, grid, &array);
+    file << "</DataArray>\n";
+    file << "</PointData>\n";
+    file << "</Piece>\n";
+    file << "</ImageData>\n";
+    file << "</VTKFile>\n";
+    file.close();
+}
+
+void Solver2d::writePVTI(string outputPath, string info){
+    int rank;
+    MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
+    PetscInt NxStart, NzStart, NxEnd, NzEnd;
+    DMDAGetCorners(this->da, &NxStart, &NzStart, NULL, &NxEnd, &NzEnd, NULL);
+    if (rank == 0){
+        // write pvti file
+        string pvtiPath = outputPath.substr(0, outputPath.size() - 4) + ".pvti";
+        fstream pvtiFile;
+        pvtiFile.open(pvtiPath, ios::out);
+        pvtiFile << "<?xml version=\"1.0\"?>\n";
+        pvtiFile << "<VTKFile type=\"PImageData\" version=\"0.1\" byte_order=\"LittleEndian\">\n";
+        pvtiFile << "<PImageData WholeExtent=\"" << NxStart << " " << NxStart + NxEnd - 1 << " " << NzStart << " " << NzStart + NzEnd - 1 << " 0 0\" Origin=\"0 0 0\" Spacing=\"" << dx << " " << dz << " 0\">\n";
+        pvtiFile << "<PPointData Scalars=\"" << info << "\">\n";
+        pvtiFile << "<PDataArray type=\"Float32\" Name=\"" << info << "\" format=\"ascii\"/>\n";
+        pvtiFile << "</PPointData>\n";
+        pvtiFile << "<Piece Extent=\"" << NxStart << " " << NxStart + NxEnd - 1 << " " << NzStart << " " << NzStart + NzEnd - 1 << " 0 0\" Source=\"" << outputPath << "\"/>\n";
+        pvtiFile << "</PImageData>\n";
+        pvtiFile << "</VTKFile>\n";
+        pvtiFile.close();
+    }
+}
+
+void Solver2d::saveVTIbin(Vec grid, string outputPath, string info){
+    vtkSmartPointer<vtkImageData> imageData = vtkSmartPointer<vtkImageData>::New();
+    imageData->SetExtent(STENCIL, Nx - 1 - STENCIL, STENCIL, Nz - 1 - STENCIL, 0, 0);
+    imageData->SetOrigin(STENCIL*dx, (Nz - 1)*dz, 0);
+    imageData->SetSpacing(dx, dz, 0);
+    vtkSmartPointer<vtkFloatArray> data = vtkSmartPointer<vtkFloatArray>::New();
+    data->SetNumberOfComponents(1);
+    data->SetNumberOfTuples(Nx*Nz);
+    data->SetName(info.c_str());
+    PetscScalar *array;
+    VecGetArray(grid, &array);
+    for (int j = STENCIL; j < Nz - STENCIL; j++){
+        for (int i = STENCIL; i < Nx - STENCIL; i++){
+            data->SetTuple1(i + j*Nx, array[j*Nx + i]);
+        }
+    }
+    VecRestoreArray(grid, &array);
+    imageData->GetPointData()->SetScalars(data);
+    vtkSmartPointer<vtkXMLImageDataWriter> writer = vtkSmartPointer<vtkXMLImageDataWriter>::New();
+    writer->SetFileName(outputPath.c_str());
+    writer->SetInputData(imageData);
+    writer->SetDataModeToBinary();
+    writer->Write();
 }
 
 float Solver2d::source(int x, int z, float k){
-    if (x != (int)(this->d.xs/this->d.dx) || z!= (int)(this->d.zs/this->d.dz) || k*this->d.dt > 0.5){
+    float fcorte = 40;
+    if (x != (int)(this->xs/this->dx) || z!= (int)(this->zs/this->dz) || k*this->dt > 0.5){
         return 0;
-    } 
-    float td = k*this->d.dt - ((2.0f*sqrtf(M_PI))/this->d.fcorte);  
-    float fc = (this->d.fcorte/(3.0f*sqrtf(M_PI)));
+    }
+    float td = k*this->dt - ((2.0f*sqrtf(M_PI))/fcorte);
+    float fc = (fcorte/(3.0f*sqrtf(M_PI)));
     return (1.0f - 2.0f * M_PI * powf(M_PI * fc * td, 2.0f))/powf(M_E, M_PI*powf((M_PI*fc*td), 2.0f));
 }
 
-void Solver2d::computeNext(Domain d, Grid2d* u_current, Grid2d* u_next, int k){
-    int sizez = d.Nz - STENCIL;
-    int sizex = d.Nx - STENCIL;
+void Solver2d::computeNext(int k){
+    int sizez = Nz - STENCIL;
+    int sizex = Nx - STENCIL;
     float val, courantNumber, const1, const2;
-    for (int j = STENCIL; j <= sizez; j++){
-        for (int i = STENCIL; i <= sizex; i++){
-            courantNumber = d.dt*d.vel->get(j, i)/d.dx;
+
+    DMGlobalToLocalBegin(da,this->u_current,INSERT_VALUES,this->u_current_local);
+    DMGlobalToLocalEnd(da,this->u_current,INSERT_VALUES,this->u_current_local);
+    DMGlobalToLocalBegin(da,this->u_next,INSERT_VALUES,this->u_next_local);
+    DMGlobalToLocalEnd(da,this->u_next,INSERT_VALUES,this->u_next_local);
+
+    PetscScalar **u_currentArray, **u_nextArray, **velArray;
+    DMDAVecGetArray(da, u_current_local, &u_currentArray);
+    DMDAVecGetArray(da, u_next_local, &u_nextArray);
+    DMDAVecGetArray(da, vel_local, &velArray);
+    PetscInt NzStart, NxStart, NzEnd, NxEnd;
+    DMDAGetCorners(da, &NxStart, &NzStart, NULL, &NxEnd, &NzEnd, NULL);
+    NzEnd = NzStart + NzEnd;
+    NxEnd = NxStart + NxEnd;
+    if (NzStart < STENCIL){
+        NzStart = STENCIL;
+    }
+    if (NxStart < STENCIL){
+        NxStart = STENCIL;
+    }
+    if (NzEnd > this->Nz - STENCIL){
+        NzEnd = NzEnd - STENCIL;
+    }
+    if (NxEnd > this->Nx - STENCIL){
+        NxEnd = NxEnd - STENCIL;
+    }
+    for (int j = NzStart; j < NzEnd; j++){
+        for (int i = NxStart; i < NxEnd; i++){
+            courantNumber = dt*velArray[j][i]/dx;
             const1 = (powf(courantNumber, 2.0f)/12.0f);
-            const2 = powf(d.vel->get(j, i)*d.dt, 2.0f);
-            val = 
+            const2 = powf(velArray[j][i]*dt, 2.0f);
+            val =
             const1 *
             (
-                -1*(u_current->get(j, i - 2) + u_current->get(j - 2, i)) + 
-                16*(u_current->get(j, i - 1) + u_current->get(j - 1, i)) - 
-                60* u_current->get(j,     i) +
-                16*(u_current->get(j, i + 1) + u_current->get(j + 1, i)) -
-                   (u_current->get(j, i + 2) + u_current->get(j + 2, i)) 
-            ) 
-            + 2*u_current->get(j, i) - u_next->get(j, i) - const2 * this->source(i, j, k);
-            u_next->set(j, i, val);
+                -1*(u_currentArray[j][i - 2] + u_currentArray[j - 2][i]) +
+                16*(u_currentArray[j][i - 1] + u_currentArray[j - 1][i]) -
+                60* u_currentArray[j][i] +
+                16*(u_currentArray[j][i + 1] + u_currentArray[j + 1][i]) -
+                   (u_currentArray[j][i + 2] + u_currentArray[j + 2][i])
+            )
+            + 2*u_currentArray[j][i] - u_nextArray[j][i] - const2 * this->source(i, j, k);
+            u_nextArray[j][i] = val;
         }
     }
+    DMDAVecRestoreArray(da, u_current_local, &u_currentArray);
+    DMDAVecRestoreArray(da, u_next_local, &u_nextArray);
+
+    DMLocalToGlobalBegin(da,u_current_local,INSERT_VALUES,u_current);
+    DMLocalToGlobalEnd(da,u_current_local,INSERT_VALUES,u_current);
+    DMLocalToGlobalBegin(da,u_next_local,INSERT_VALUES,u_next);
+    DMLocalToGlobalEnd(da,u_next_local,INSERT_VALUES,u_next);
 }
 
-void Solver2d::applyReynoldsBC(Grid2d* u_current, Grid2d* u_next){
-    for(int j = STENCIL; j < d.Nz - STENCIL; j++){
-        for(int i = STENCIL; i <= STENCIL + 1; i++){
-            float courantNumber = d.dt * d.vel->get(j, i)/d.dx;
-            (*u_next)(j, i) = (*u_current)(j, i) + courantNumber*((*u_current)(j, i + 1) - (*u_current)(j, i));
+void Solver2d::computeNextInverted(int k){
+    int sizez = Nz - STENCIL;
+    int sizex = Nx - STENCIL;
+    float val, courantNumber, const1, const2;
+
+    DMGlobalToLocalBegin(da,this->u_current,INSERT_VALUES,this->u_current_local);
+    DMGlobalToLocalEnd(da,this->u_current,INSERT_VALUES,this->u_current_local);
+    DMGlobalToLocalBegin(da,this->u_next,INSERT_VALUES,this->u_next_local);
+    DMGlobalToLocalEnd(da,this->u_next,INSERT_VALUES,this->u_next_local);
+
+    PetscScalar **u_currentArray, **u_nextArray, **velArray;
+    DMDAVecGetArray(da, u_current_local, &u_nextArray);
+    DMDAVecGetArray(da, u_next_local, &u_currentArray);
+    DMDAVecGetArray(da, vel_local, &velArray);
+    PetscInt NzStart, NxStart, NzEnd, NxEnd;
+    DMDAGetCorners(da, &NxStart, &NzStart, NULL, &NxEnd, &NzEnd, NULL);
+    NzEnd = NzStart + NzEnd;
+    NxEnd = NxStart + NxEnd;
+    if (NzStart < STENCIL){
+        NzStart = STENCIL;
+    }
+    if (NxStart < STENCIL){
+        NxStart = STENCIL;
+    }
+    if (NzEnd > this->Nz - STENCIL){
+        NzEnd = NzEnd - STENCIL;
+    }
+    if (NxEnd > this->Nx - STENCIL){
+        NxEnd = NxEnd - STENCIL;
+    }
+    for (int j = NzStart; j < NzEnd; j++){
+        for (int i = NxStart; i < NxEnd; i++){
+            courantNumber = dt*velArray[j][i]/dx;
+            const1 = (powf(courantNumber, 2.0f)/12.0f);
+            const2 = powf(velArray[j][i]*dt, 2.0f);
+            val =
+            const1 *
+            (
+                -1*(u_currentArray[j][i - 2] + u_currentArray[j - 2][i]) +
+                16*(u_currentArray[j][i - 1] + u_currentArray[j - 1][i]) -
+                60* u_currentArray[j][i] +
+                16*(u_currentArray[j][i + 1] + u_currentArray[j + 1][i]) -
+                   (u_currentArray[j][i + 2] + u_currentArray[j + 2][i])
+            )
+            + 2*u_currentArray[j][i] - u_nextArray[j][i] - const2 * this->source(i, j, k);
+            u_nextArray[j][i] = val;
         }
     }
-    for(int j = STENCIL; j < d.Nz - STENCIL; j++){
-        for(int i = d.Nx - STENCIL - 1; i <= d.Nx - STENCIL; i++){
-            float courantNumber = d.dt * d.vel->get(j, i)/d.dx;
-            (*u_next)(j, i) = (*u_current)(j, i) - courantNumber*((*u_current)(j, i) - (*u_current)(j, i - 1));
-        }
-    }
-    for(int i = STENCIL; i < d.Nx - STENCIL; i++){
-        for(int j = STENCIL; j <= STENCIL + 1; j++){
-            float courantNumber = d.dt * d.vel->get(j, i)/d.dx;
-            (*u_next)(j, i) = (*u_current)(j, i) + courantNumber*((*u_current)(j + 1, i) - (*u_current)(j, i));
-        }
-    }
-    for(int i = STENCIL; i < d.Nx - STENCIL; i++){
-        for(int j = d.Nz - STENCIL - 1; j <= d.Nz - STENCIL; j++){
-            float courantNumber = d.dt * d.vel->get(j, i)/d.dx;
-            (*u_next)(j, i) = (*u_current)(j, i) - courantNumber*((*u_current)(j, i) - (*u_current)(j - 1, i));
-        }
-    }
+    DMDAVecRestoreArray(da, u_current_local, &u_currentArray);
+    DMDAVecRestoreArray(da, u_next_local, &u_nextArray);
+
+    DMLocalToGlobalBegin(da,u_current_local,INSERT_VALUES,u_current);
+    DMLocalToGlobalEnd(da,u_current_local,INSERT_VALUES,u_current);
+    DMLocalToGlobalBegin(da,u_next_local,INSERT_VALUES,u_next);
+    DMLocalToGlobalEnd(da,u_next_local,INSERT_VALUES,u_next);
 }
 
-float Solver2d::mitigation(float x, int borda){
+void Solver2d::applyReynoldsBC(Vec u_current, Vec u_next){
+    DMGlobalToLocalBegin(da,this->u_current,INSERT_VALUES,this->u_current_local);
+    DMGlobalToLocalEnd(da,this->u_current,INSERT_VALUES,this->u_current_local);
+    DMGlobalToLocalBegin(da,this->u_next,INSERT_VALUES,this->u_next_local);
+    DMGlobalToLocalEnd(da,this->u_next,INSERT_VALUES,this->u_next_local);
+
+    PetscScalar **u_currentArray, **u_nextArray, **velArray;
+    DMDAVecGetArray(da, u_current_local, &u_currentArray);
+    DMDAVecGetArray(da, u_next_local, &u_nextArray);
+    DMDAVecGetArray(da, vel_local, &velArray);
+    PetscInt NzStart, NxStart, NzEnd, NxEnd;
+    DMDAGetCorners(da, &NxStart, &NzStart, NULL, &NxEnd, &NzEnd, NULL);
+    bool bc[4];
+    NzEnd = NzStart + NzEnd;
+    NxEnd = NxStart + NxEnd;
+    bc[0] = NxStart == 0;      // left
+    bc[1] = NzStart == 0;      // bottom
+    bc[2] = NxEnd == this->Nx; // right
+    bc[3] = NzEnd == this->Nz; // top
+    if (NzStart < STENCIL){
+        NzStart = STENCIL;
+    }
+    if (NxStart < STENCIL){
+        NxStart = STENCIL;
+    }
+    if (NzEnd > this->Nz - STENCIL){
+        NzEnd = NzEnd - STENCIL;
+    }
+    if (NxEnd > this->Nx - STENCIL){
+        NxEnd = NxEnd - STENCIL;
+    }
+    if (bc[0]){
+        for (int j = NzStart; j < NzEnd; j++){
+            // float courantNumber = dt * vel->get(j, STENCIL)/dx;
+            // (*u_next)(j, STENCIL - 1) = (*u_current)(j, STENCIL - 1) - courantNumber*((*u_current)(j, STENCIL) - (*u_current)(j, STENCIL - 1));
+            int i = STENCIL + 1;
+            float courantNumber = dt * velArray[j][i]/dx;
+            u_nextArray[j][i] = u_currentArray[j][i] + courantNumber*(u_currentArray[j][i + 1] - u_currentArray[j][i]);
+        }
+    }
+    if (bc[1]){
+        for (int i = NxStart; i < NxEnd; i++){
+            // float courantNumber = dt * vel->get(STENCIL, i)/dx;
+            // (*u_next)(STENCIL - 1, i) = (*u_current)(STENCIL - 1, i) - courantNumber*((*u_current)(STENCIL, i) - (*u_current)(STENCIL - 1, i));
+            int j = STENCIL + 1;
+            float courantNumber = dt * velArray[j][i]/dx;
+            u_nextArray[j][i] = u_currentArray[j][i] + courantNumber*(u_currentArray[j + 1][i] - u_currentArray[j][i]);
+        }
+    }
+    if (bc[2]){
+        for (int j = NzStart; j < NzEnd; j++){
+            // float courantNumber = dt * vel->get(j, Nx - STENCIL - 1)/dx;
+            // (*u_next)(j, Nx - STENCIL) = (*u_current)(j, Nx - STENCIL) - courantNumber*((*u_current)(j, Nx - STENCIL) - (*u_current)(j, Nx - STENCIL - 1));
+            int i = Nx - STENCIL - 2;
+            float courantNumber = dt * velArray[j][i]/dx;
+            u_nextArray[j][i] = u_currentArray[j][i] - courantNumber*(u_currentArray[j][i] - u_currentArray[j][i - 1]);
+        }
+    }
+    if (bc[3]){
+        for (int i = NxStart; i < NxEnd; i++){
+            // float courantNumber = dt * vel->get(Nz - STENCIL - 1, i)/dx;
+            // (*u_next)(Nz - STENCIL, i) = (*u_current)(Nz - STENCIL, i) - courantNumber*((*u_current)(Nz - STENCIL, i) - (*u_current)(Nz - STENCIL - 1, i));
+            int j = Nz - STENCIL - 2;
+            float courantNumber = dt * velArray[j][i]/dx;
+            u_nextArray[j][i] = u_currentArray[j][i] - courantNumber*(u_currentArray[j][i] - u_currentArray[j - 1][i]);
+        }
+    }
+    DMDAVecRestoreArray(da, u_current_local, &u_currentArray);
+    DMDAVecRestoreArray(da, u_next_local, &u_nextArray);
+
+    DMLocalToGlobalBegin(da,u_current_local,INSERT_VALUES,u_current);
+    DMLocalToGlobalEnd(da,u_current_local,INSERT_VALUES,u_current);
+    DMLocalToGlobalBegin(da,u_next_local,INSERT_VALUES,u_next);
+    DMLocalToGlobalEnd(da,u_next_local,INSERT_VALUES,u_next);
+}
+
+float Solver2d::mitigation(float x, int border){
     float fat = 0.0055f;
-    return expf(-(powf(fat*(borda - x), 2.0f)));
+    return expf(-(powf(fat*(border - x), 2.0f)));
 }
 
 void Solver2d::applyAbsorptionBC(){
-    int borda = 25;
-    for(int j = STENCIL; j < borda; j++){
-        for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
-            u_current->set(j, i, u_current->get(j, i)*mitigation(j, borda));
-            u_next->set(j, i, u_next->get(j, i)*mitigation(j, borda));
-        }
-    }
-    for(int j = d.Nz - borda; j <= d.Nz - STENCIL; j++){
-        for(int i = STENCIL; i <= d.Nx - STENCIL; i++){
-            u_current->set(j, i, u_current->get(j, i)*mitigation(d.Nz - j, borda));
-            u_next->set(j, i, u_next->get(j, i)*mitigation(d.Nz - j, borda));
-        }
-    }
-    for(int j = borda; j < d.Nz - borda; j++){
-        for(int i = STENCIL; i <= borda; i++){
-            u_current->set(j,i, u_current->get(j, i)*mitigation(i, borda));
-            u_next->set(j,i, u_next->get(j, i)*mitigation(i, borda));
-        }
-    }
-    for(int j = borda; j < d.Nz - borda; j++){
-        for(int i = d.Nx - borda; i <= d.Nx - STENCIL; i++){
-            u_current->set(j,i, u_current->get(j, i)*mitigation((d.Nx - i), borda));
-            u_next->set(j,i, u_next->get(j, i)*mitigation((d.Nx - i), borda));
-        }
-    }
-}
+    int border = 25;
 
+    DMGlobalToLocalBegin(da,this->u_current,INSERT_VALUES,this->u_current_local);
+    DMGlobalToLocalEnd(da,this->u_current,INSERT_VALUES,this->u_current_local);
+    DMGlobalToLocalBegin(da,this->u_next,INSERT_VALUES,this->u_next_local);
+    DMGlobalToLocalEnd(da,this->u_next,INSERT_VALUES,this->u_next_local);
+
+    PetscScalar **u_currentArray, **u_nextArray;
+    DMDAVecGetArray(da, u_current_local, &u_currentArray);
+    DMDAVecGetArray(da, u_next_local, &u_nextArray);
+
+    PetscInt NzStart, NxStart, NzEnd, NxEnd;
+    DMDAGetCorners(da, &NxStart, &NzStart, NULL, &NxEnd, &NzEnd, NULL);
+    bool bc[4];
+    NzEnd = NzStart + NzEnd;
+    NxEnd = NxStart + NxEnd;
+    bc[0] = NxStart == 0;      // left
+    bc[1] = NzStart == 0;      // bottom
+    bc[2] = NxEnd == this->Nx; // right
+    bc[3] = NzEnd == this->Nz; // top
+    if (NzStart < STENCIL){
+        NzStart = STENCIL;
+    }
+    if (NxStart < STENCIL){
+        NxStart = STENCIL;
+    }
+    if (NzEnd > this->Nz - STENCIL){
+        NzEnd = NzEnd - STENCIL;
+    }
+    if (NxEnd > this->Nx - STENCIL){
+        NxEnd = NxEnd - STENCIL;
+    }
+
+    if (bc[0]){
+        for (int j = NzStart; j < NzEnd; j++){
+            for (int i = NxStart; i <= border; i++){
+                u_currentArray[j][i] = u_currentArray[j][i]*mitigation(i, border);
+                u_nextArray[j][i] = u_nextArray[j][i]*mitigation(i, border);
+            }
+        }
+    }
+    if (bc[1]){
+        for (int i = NxStart; i < NxEnd; i++){
+            for (int j = NzStart; j <= border; j++){
+                u_currentArray[j][i] = u_currentArray[j][i]*mitigation(j, border);
+                u_nextArray[j][i] = u_nextArray[j][i]*mitigation(j, border);
+            }
+        }
+    }
+    if (bc[2]){
+        for (int j = NzStart; j < NzEnd; j++){
+            for (int i = NxEnd - border; i < NxEnd; i++){
+                u_currentArray[j][i] = u_currentArray[j][i]*mitigation(Nx - i, border);
+                u_nextArray[j][i] = u_nextArray[j][i]*mitigation(Nx - i, border);
+            }
+        }
+    }
+    if (bc[3]){
+        for (int i = NxStart; i < NxEnd; i++){
+            for (int j = NzEnd - border; j < NzEnd; j++){
+                u_currentArray[j][i] = u_currentArray[j][i]*mitigation(Nz - j, border);
+                u_nextArray[j][i] = u_nextArray[j][i]*mitigation(Nz - j, border);
+            }
+        }
+    }
+    DMDAVecRestoreArray(da, u_current_local, &u_currentArray);
+    DMDAVecRestoreArray(da, u_next_local, &u_nextArray);
+
+    DMLocalToGlobalBegin(da,u_current_local,INSERT_VALUES,u_current);
+    DMLocalToGlobalEnd(da,u_current_local,INSERT_VALUES,u_current);
+    DMLocalToGlobalBegin(da,u_next_local,INSERT_VALUES,u_next);
+    DMLocalToGlobalEnd(da,u_next_local,INSERT_VALUES,u_next);
+}

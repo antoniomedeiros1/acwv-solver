@@ -10,10 +10,10 @@ build
 config
 
 data/*
+!data/.gitkeep
 
 analise_2d.txt
 gmon.out
-mdf
 .cache/
 
 .ipynb_checkpoints
