@@ -89,49 +89,51 @@ void Solver2d::readInputVtkImageData(string input_file){
     int* extent = new int[6];
     double* spacing = new double[3];
     vtkSmartPointer<vtkDataArray> data;
-    if (rank == 0){
-        vtkSmartPointer<vtkXMLImageDataReader> reader = vtkSmartPointer<vtkXMLImageDataReader>::New();
-        reader->SetFileName(input_file.c_str());
-        reader->Update();
-        vtkSmartPointer<vtkImageData> imageData = reader->GetOutput();
-        extent = imageData->GetExtent();
-        spacing = imageData->GetSpacing();
-        data = imageData->GetPointData()->GetScalars();
-    }
-    MPI_Bcast(extent, 6, MPI_INT, 0, PETSC_COMM_WORLD);
-    MPI_Bcast(spacing, 3, MPI_DOUBLE, 0, PETSC_COMM_WORLD);
+
+    vtkSmartPointer<vtkXMLImageDataReader> reader = vtkSmartPointer<vtkXMLImageDataReader>::New();
+    reader->SetFileName(input_file.c_str());
+    reader->Update();
+    vtkSmartPointer<vtkImageData> imageData = reader->GetOutput();
+    extent = imageData->GetExtent();
+    spacing = imageData->GetSpacing();
+    data = imageData->GetPointData()->GetScalars();
+
     this->Nx = extent[1] - extent[0] + 1;
     this->Nz = extent[3] - extent[2] + 1;
     this->dx = spacing[0];
     this->dz = spacing[1];
+
     DMDACreate2d(PETSC_COMM_WORLD, DM_BOUNDARY_NONE, DM_BOUNDARY_NONE, DMDA_STENCIL_STAR, this->Nx, this->Nz, PETSC_DECIDE, PETSC_DECIDE, 1, 1, NULL, NULL, &this->da);
     DMDASetStencilWidth(this->da, STENCIL);
     DMSetFromOptions(this->da);
     DMSetUp(this->da);
+
     DMCreateGlobalVector(this->da, &this->vel);
     DMCreateLocalVector(this->da, &this->vel_local);
-    int NxStart, NzStart, NxEnd, NzEnd;
-    DMDAGetCorners(this->da, &NxStart, &NzStart, NULL, &NxEnd, &NzEnd, NULL);
-    // VecGetArray(this->vel_local, &velArray);
-    if (rank == 0){
-        PetscScalar *velArray;
-        velArray = new PetscScalar[Nx*Nz];
-        PetscInt *indexArray;
-        indexArray = new PetscInt[Nx*Nz];
-        int k = 0;
-        for (int j = 0; j < Nz; j++){
-            for (int i = 0; i < Nx; i++){
-                indexArray[k] = j*this->Nz + i;
-                velArray[k] = (PetscScalar)data->GetTuple1(j*this->Nz + i);
-                k++;
-            }
-        }
-        VecSetValues(this->vel, this->Nz*this->Nx, indexArray, velArray, INSERT_VALUES);
-    }
+    VecSet(this->vel, 3000.0);
     VecAssemblyBegin(this->vel);
     VecAssemblyEnd(this->vel);
-    DMGlobalToLocalBegin(this->da, this->vel, INSERT_VALUES, this->vel_local);
-    DMGlobalToLocalEnd(this->da, this->vel, INSERT_VALUES, this->vel_local);
+
+    PetscInt NxStart, NzStart, NxEnd, NzEnd;
+    DMDAGetCorners(this->da, &NxStart, &NzStart, NULL, &NxEnd, &NzEnd, NULL);
+
+    DMGlobalToLocalBegin(da, this->vel, INSERT_VALUES, this->vel_local);
+    DMGlobalToLocalEnd(da, this->vel, INSERT_VALUES, this->vel_local);
+
+    PetscScalar **velArray;
+    DMDAVecGetArray(da, this->vel_local, &velArray);
+
+    // PetscInt NzStart, NxStart, NzEnd, NxEnd;
+    // DMDAGetCorners(da, &NxStart, &NzStart, NULL, &NxEnd, &NzEnd, NULL);
+    for (int j = NzStart; j < NzStart + NzEnd; j++){
+        for (int i = NxStart; i < NxStart + NxEnd; i++){
+            velArray[j][i] = (PetscScalar)data->GetTuple1(j*this->Nx + i);
+        }
+    }
+    DMDAVecRestoreArray(da, this->vel_local, &velArray);
+
+    DMLocalToGlobalBegin(da,this->vel_local,INSERT_VALUES,this->vel);
+    DMLocalToGlobalEnd(da,this->vel_local,INSERT_VALUES,this->vel);
 }
 
 void Solver2d::saveVTI(Vec grid, string outputPath, string info){
@@ -266,11 +268,13 @@ void Solver2d::computeNext(int k){
     DMGlobalToLocalEnd(da,this->u_current,INSERT_VALUES,this->u_current_local);
     DMGlobalToLocalBegin(da,this->u_next,INSERT_VALUES,this->u_next_local);
     DMGlobalToLocalEnd(da,this->u_next,INSERT_VALUES,this->u_next_local);
+    DMGlobalToLocalBegin(da, this->vel, INSERT_VALUES, this->vel_local);
+    DMGlobalToLocalEnd(da, this->vel, INSERT_VALUES, this->vel_local);
 
     PetscScalar **u_currentArray, **u_nextArray, **velArray;
     DMDAVecGetArray(da, u_current_local, &u_currentArray);
     DMDAVecGetArray(da, u_next_local, &u_nextArray);
-    DMDAVecGetArray(da, vel_local, &velArray);
+    DMDAVecGetArray(da, this->vel_local, &velArray);
     PetscInt NzStart, NxStart, NzEnd, NxEnd;
     DMDAGetCorners(da, &NxStart, &NzStart, NULL, &NxEnd, &NzEnd, NULL);
     NzEnd = NzStart + NzEnd;
