@@ -1,7 +1,15 @@
 #include "../include/Solver2d.h"
 
 
-Solver2d::Solver2d(string input_file, string output_folder, int number_of_steps, float dt, int number_of_frames){
+Solver2d::Solver2d(
+        string input_file,
+        string output_folder,
+        int xs,
+        int zs,
+        int number_of_steps,
+        float dt,
+        int number_of_frames
+){
     int nprocs;
     MPI_Comm_size(PETSC_COMM_WORLD, &nprocs);
     this->outputFolder = output_folder;
@@ -13,8 +21,10 @@ Solver2d::Solver2d(string input_file, string output_folder, int number_of_steps,
     this->Z = this->Nz * this->dz;
     this->T = this->Nt * this->dt;
     this->frameRate = this->Nt/number_of_frames;
-    this->xs = int(this->X/2);
-    this->zs = int(this->Z/2);
+    // this->xs = int(this->X/2);
+    // this->zs = int(this->Z/2);
+    this->xs = xs;
+    this->zs = zs;
     DMCreateGlobalVector(this->da, &this->u_current);
     DMCreateLocalVector(this->da, &this->u_current_local);
     DMCreateGlobalVector(this->da, &this->u_next);

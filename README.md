@@ -57,19 +57,21 @@ make
 
 ### Input File
 
-First, you need to generate the velocity field input file. The velocity field is a VTK Image Data file that contains the speed of the wave at each point of the domain, as well as the grid spacing and size. You can use the 'generate_input.ipynb' Jupyter notebook as reference on how to generate the velocity field. 
+First, you need to generate the velocity field input file. The velocity field is a VTK Image Data file that contains the speed of the wave at each point of the domain, as well as the grid spacing and size. You can use the 'generate_input.ipynb' Jupyter notebook as reference on how to generate the velocity field.
 
 ### Running the code
 
 To run the code, you can use the following command:
 
 ```sh
-./acwv <input_file> <output_folder> <number_of_steps> <dt> [number_of_frames]
+./acwv <input_file> <output_folder> <xs> <zs> <number_of_steps> <dt> [number_of_frames]
 ```
 
 where:
 - `<input_file>` is the path to the velocity field input file.
 - `<output_folder>` is the path to the folder where the output files will be saved.
+- `<xs>` x position of the pulse source.
+- `<zs>` z position of the pulse source.
 - `<number_of_steps>` is the number of time steps to simulate.
 - `<dt>` is the time step.
 - `[number_of_frames]` is the number of frames to save. If not provided, default is 40.
@@ -89,12 +91,12 @@ The wave equation is a partial differential equation that describes the behavior
 where:
 - ![p](https://latex.codecogs.com/svg.latex?p) is the pressure field,
 - ![v](https://latex.codecogs.com/svg.latex?v) is the speed of sound in the medium,
-- ![t](https://latex.codecogs.com/svg.latex?t) is time, and 
+- ![t](https://latex.codecogs.com/svg.latex?t) is time, and
 - ![%5Cnabla%5E2](https://latex.codecogs.com/svg.latex?%5Cnabla%5E2) is the Laplacian operator.
 
 ## Finite Difference Method
 
-The Finite Difference Method is a numerical technique used to solve partial differential equations. The basic idea is to discretize the domain of the problem into a grid and approximate the derivatives in the differential equation using finite differences. 
+The Finite Difference Method is a numerical technique used to solve partial differential equations. The basic idea is to discretize the domain of the problem into a grid and approximate the derivatives in the differential equation using finite differences.
 
 For this project, we used a fourth-order finite difference scheme to approximate the Laplacian operator and a second-order finite difference scheme to approximate the time derivative ([more details](https://tattered-sleet-912.notion.site/2-1-M-todo-das-Diferen-as-Finitas-5fc05140011841648f7478e83fd5ffb2?pvs=4)).
 

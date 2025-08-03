@@ -23,7 +23,7 @@ using namespace std;
 class Solver2d{
 
     public:
-        Solver2d(string input_file, string output_folder, int number_of_steps, float dt, int number_of_frames);
+        Solver2d(string input_file, string output_folder, int xs, int zs, int number_of_steps, float dt, int number_of_frames);
         ~Solver2d();
         void printParameters();
         void saveVTI(Vec u, string outputPath, string info);
@@ -32,8 +32,8 @@ class Solver2d{
         void saveVTIbin(Vec u, string outputPath, string info);
         void savePVTI(Vec u, string outputPath, string info);
         void solve();
-    
-    private: 
+
+    private:
         void readInputTxt(string input_file);
         void readInputVtkImageData(string input_file);
         void computeNext(int k);
